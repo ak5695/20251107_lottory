@@ -200,6 +200,25 @@ export default function LotteryApp() {
     setShowPreview(false);
   };
 
+  // 生成一万组数据（0000-9999的所有组合）
+  const generateAllData = () => {
+    const allNumbers: string[] = [];
+    for (let i = 0; i <= 9999; i++) {
+      // 将数字格式化为四位数字符串，不足四位前面补0
+      allNumbers.push(i.toString().padStart(4, "0"));
+    }
+    const dataStr = allNumbers.join(" ");
+    setInputData(dataStr);
+    setImportedCount(10000);
+    setImportSuccess(true);
+    // 自动折叠输入区
+    setIsDataExpanded(false);
+
+    // 显示浮动成功提示
+    setShowFloatingSuccess(true);
+    setTimeout(() => setShowFloatingSuccess(false), 1000);
+  };
+
   const renderNumberButtons = (
     position: keyof typeof excludedNumbers,
     label: string
@@ -281,7 +300,7 @@ export default function LotteryApp() {
                     d="M5 13l4 4L19 7"
                   ></path>
                 </svg>
-                <span className="text-lg font-semibold">数据生成成功！</span>
+                <span className="text-lg font-semibold">生成成功！</span>
               </div>
             </div>
           )}
@@ -292,7 +311,19 @@ export default function LotteryApp() {
               onClick={() => setIsDataExpanded(!isDataExpanded)}
             >
               <CardTitle className="flex items-center justify-between">
-                <span>数据输入区</span>
+                <div className="flex items-center gap-4">
+                  <span>数据输入</span>
+                  <Button
+                    onClick={(e) => {
+                      e.stopPropagation(); // 防止触发折叠/展开
+                      generateAllData();
+                    }}
+                    size="sm"
+                    className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 text mr-4"
+                  >
+                    生成一万组
+                  </Button>
+                </div>
                 <span className="text-sm text-gray-500">
                   {isDataExpanded ? "点击收起" : "点击展开"}
                   {inputData &&
@@ -341,7 +372,7 @@ export default function LotteryApp() {
           {showSuccess && (
             <Alert className="mt-4 bg-green-100 border-green-400">
               <AlertDescription className="text-green-800">
-                数据生成成功！共筛选出 {processedData.length} 组数据。
+                筛选成功！共筛选出 {processedData.length} 组数据。
               </AlertDescription>
             </Alert>
           )}

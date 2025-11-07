@@ -206,7 +206,7 @@ export default function LotteryApp() {
   ) => (
     <div className="mb-6">
       <div className="flex items-start mb-3">
-        <span className="font-medium mr-2 sm:mr-4 w-16 sm:w-20 shrink-0 text-right text-sm sm:text-lg">
+        <span className="font-medium mr-2 sm:mr-4 w-12 sm:w-16 shrink-0 text-right text-sm sm:text-lg">
           {label}
         </span>
         <div className="flex flex-wrap gap-1 sm:gap-2 flex-1">
@@ -234,7 +234,7 @@ export default function LotteryApp() {
   ) => (
     <div className="mb-6">
       <div className="flex items-start mb-3">
-        <span className="font-medium mr-2 sm:mr-4 w-16 sm:w-20 shrink-0 text-right text-sm sm:text-lg">
+        <span className="font-medium mr-2 sm:mr-4 w-12 sm:w-16 shrink-0 text-right text-sm sm:text-lg">
           {label}
         </span>
         <div className="flex flex-wrap gap-1 sm:gap-2 flex-1">
@@ -261,7 +261,7 @@ export default function LotteryApp() {
   return (
     <div className="min-h-screen bg-gray-50 font-bold">
       {/* 主内容区域，添加底部间距以避免被固定按钮遮挡 */}
-      <div className="pt-8 px-4 pb-40 sm:pb-24">
+      <div className="pt-4 px-2 pb-40 sm:pb-10 sm:px-5">
         <div className="max-w-6xl mx-auto">
           {/* 浮动成功提示 */}
           {showFloatingSuccess && (
@@ -286,7 +286,7 @@ export default function LotteryApp() {
             </div>
           )}
 
-          <Card className="mb-6">
+          <Card className="mb-4">
             <CardHeader
               className="cursor-pointer"
               onClick={() => setIsDataExpanded(!isDataExpanded)}
@@ -318,8 +318,8 @@ export default function LotteryApp() {
           </Card>
 
           {/* 数字排除选择区 */}
-          <Card>
-            <CardContent className="pt-6 px-3">
+          <Card className="mb-15">
+            <CardContent className="pt-0 pb-0 px-1">
               {renderNumberButtons("thousands", "杀千")}
               {renderNumberButtons("hundreds", "杀百")}
               {renderNumberButtons("tens", "杀十")}

@@ -159,6 +159,56 @@ export default function LotteryApp() {
     showSuccessMessage("生成成功！");
   };
 
+  // 实时计算筛选后的组数
+  const calculateFilteredCount = () => {
+    if (!inputData.trim()) return 0;
+
+    const numbers = inputData
+      .trim()
+      .split(/\s+/)
+      .filter((num) => /^\d{4}$/.test(num));
+
+    if (numbers.length === 0) return 0;
+
+    const filtered = numbers.filter((num) => {
+      const digits = num.split("").map(Number);
+      const [thousands, hundreds, tens, units] = digits;
+
+      // 检查单个位置的排除
+      if (
+        excludedNumbers.thousands.has(thousands) ||
+        excludedNumbers.hundreds.has(hundreds) ||
+        excludedNumbers.tens.has(tens) ||
+        excludedNumbers.units.has(units)
+      ) {
+        return false;
+      }
+
+      // 检查组合位置的排除（两位数字之和）
+      const thousandsHundreds = thousands + hundreds;
+      const thousandsTens = thousands + tens;
+      const thousandsUnits = thousands + units;
+      const hundredsTens = hundreds + tens;
+      const hundredsUnits = hundreds + units;
+      const tensUnits = tens + units;
+
+      if (
+        excludedNumbers.thousandsHundreds.has(thousandsHundreds) ||
+        excludedNumbers.thousandsTens.has(thousandsTens) ||
+        excludedNumbers.thousandsUnits.has(thousandsUnits) ||
+        excludedNumbers.hundredsTens.has(hundredsTens) ||
+        excludedNumbers.hundredsUnits.has(hundredsUnits) ||
+        excludedNumbers.tensUnits.has(tensUnits)
+      ) {
+        return false;
+      }
+
+      return true;
+    });
+
+    return filtered.length;
+  };
+
   // 生成并预览数据
   const generateAndPreview = () => {
     const numbers = inputData
@@ -402,7 +452,7 @@ export default function LotteryApp() {
               disabled={!inputData.trim()}
               className="bg-red-500 hover:bg-red-600 text-white px-4 sm:px-8 py-3 text-base sm:text-lg disabled:bg-gray-400"
             >
-              预览筛选
+              预览筛选{inputData.trim() && ` (${calculateFilteredCount()}组)`}
             </Button>
 
             <Dialog open={showPreview} onOpenChange={setShowPreview}>

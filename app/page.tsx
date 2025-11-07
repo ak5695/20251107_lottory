@@ -30,15 +30,21 @@ export default function LotteryApp() {
     tensUnits: new Set<number>(),
   });
   const [showPreview, setShowPreview] = useState(false);
-  const [showSuccess, setShowSuccess] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [isDataExpanded, setIsDataExpanded] = useState(true);
-  const [generateSuccess, setGenerateSuccess] = useState(false);
   const [importSuccess, setImportSuccess] = useState(false);
   const [importedCount, setImportedCount] = useState(0);
   const [resetSuccess, setResetSuccess] = useState(false);
   const [showFloatingSuccess, setShowFloatingSuccess] = useState(false);
+  const [floatingMessage, setFloatingMessage] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // 显示浮动成功提示
+  const showSuccessMessage = (message: string) => {
+    setFloatingMessage(message);
+    setShowFloatingSuccess(true);
+    setTimeout(() => setShowFloatingSuccess(false), 1000);
+  };
 
   // 导入txt文件
   const handleFileImport = () => {
@@ -63,12 +69,11 @@ export default function LotteryApp() {
 
           setImportedCount(numbers.length);
           setImportSuccess(true);
-          // 导入数据后自动折叠输入区
-          setIsDataExpanded(false);
+          // 确保输入框保持展开状态
+          setIsDataExpanded(true);
 
           // 显示浮动成功提示
-          setShowFloatingSuccess(true);
-          setTimeout(() => setShowFloatingSuccess(false), 1000);
+          showSuccessMessage("导入成功！");
         };
         reader.readAsText(file);
       } else {
@@ -94,8 +99,68 @@ export default function LotteryApp() {
     });
   };
 
-  // 生成数据
-  const generateData = () => {
+  // 重置所有数据
+  const resetAll = () => {
+    setInputData("");
+    setProcessedData([]);
+    setExcludedNumbers({
+      thousands: new Set<number>(),
+      hundreds: new Set<number>(),
+      tens: new Set<number>(),
+      units: new Set<number>(),
+      thousandsHundreds: new Set<number>(),
+      thousandsTens: new Set<number>(),
+      thousandsUnits: new Set<number>(),
+      hundredsTens: new Set<number>(),
+      hundredsUnits: new Set<number>(),
+      tensUnits: new Set<number>(),
+    });
+    setErrorMessage("");
+    setImportSuccess(false);
+    setImportedCount(0);
+    setResetSuccess(true);
+    setIsDataExpanded(true);
+
+    // 显示浮动成功提示
+    showSuccessMessage("重置成功！");
+
+    // 3秒后重置按钮状态
+    setTimeout(() => setResetSuccess(false), 3000);
+  };
+
+  // 导出数据
+  const exportData = () => {
+    const dataStr = processedData.join(" ");
+    const blob = new Blob([dataStr], { type: "text/plain" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `${processedData.length}组.txt`;
+    link.click();
+    URL.revokeObjectURL(url);
+    setShowPreview(false);
+  };
+
+  // 生成一万组数据（0000-9999的所有组合）
+  const generateAllData = () => {
+    const allNumbers: string[] = [];
+    for (let i = 0; i <= 9999; i++) {
+      // 将数字格式化为四位数字符串，不足四位前面补0
+      allNumbers.push(i.toString().padStart(4, "0"));
+    }
+    const dataStr = allNumbers.join(" ");
+    setInputData(dataStr);
+    setImportedCount(10000);
+    setImportSuccess(true);
+    // 确保输入框保持展开状态
+    setIsDataExpanded(true);
+
+    // 显示浮动成功提示
+    showSuccessMessage("生成成功！");
+  };
+
+  // 生成并预览数据
+  const generateAndPreview = () => {
     const numbers = inputData
       .trim()
       .split(/\s+/)
@@ -144,79 +209,9 @@ export default function LotteryApp() {
     });
 
     setProcessedData(filtered);
-    setShowSuccess(true);
-    setGenerateSuccess(true);
-    setShowFloatingSuccess(true);
-
-    // 浮动成功提示1秒后消失
-    setTimeout(() => setShowFloatingSuccess(false), 1000);
-    // 成功提示2秒后消失
-    setTimeout(() => setShowSuccess(false), 2000);
-    // 按钮状态3秒后恢复
-    setTimeout(() => setGenerateSuccess(false), 3000);
-  };
-
-  // 重置所有数据
-  const resetAll = () => {
-    setInputData("");
-    setProcessedData([]);
-    setExcludedNumbers({
-      thousands: new Set<number>(),
-      hundreds: new Set<number>(),
-      tens: new Set<number>(),
-      units: new Set<number>(),
-      thousandsHundreds: new Set<number>(),
-      thousandsTens: new Set<number>(),
-      thousandsUnits: new Set<number>(),
-      hundredsTens: new Set<number>(),
-      hundredsUnits: new Set<number>(),
-      tensUnits: new Set<number>(),
-    });
     setErrorMessage("");
-    setGenerateSuccess(false);
-    setImportSuccess(false);
-    setImportedCount(0);
-    setResetSuccess(true);
-    setIsDataExpanded(true);
-
-    // 显示浮动成功提示
-    setShowFloatingSuccess(true);
-    setTimeout(() => setShowFloatingSuccess(false), 1000);
-
-    // 3秒后重置按钮状态
-    setTimeout(() => setResetSuccess(false), 3000);
-  };
-
-  // 导出数据
-  const exportData = () => {
-    const dataStr = processedData.join(" ");
-    const blob = new Blob([dataStr], { type: "text/plain" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `${processedData.length}组.txt`;
-    link.click();
-    URL.revokeObjectURL(url);
-    setShowPreview(false);
-  };
-
-  // 生成一万组数据（0000-9999的所有组合）
-  const generateAllData = () => {
-    const allNumbers: string[] = [];
-    for (let i = 0; i <= 9999; i++) {
-      // 将数字格式化为四位数字符串，不足四位前面补0
-      allNumbers.push(i.toString().padStart(4, "0"));
-    }
-    const dataStr = allNumbers.join(" ");
-    setInputData(dataStr);
-    setImportedCount(10000);
-    setImportSuccess(true);
-    // 自动折叠输入区
-    setIsDataExpanded(false);
-
-    // 显示浮动成功提示
-    setShowFloatingSuccess(true);
-    setTimeout(() => setShowFloatingSuccess(false), 1000);
+    // 直接显示预览窗口
+    setShowPreview(true);
   };
 
   const renderNumberButtons = (
@@ -300,18 +295,18 @@ export default function LotteryApp() {
                     d="M5 13l4 4L19 7"
                   ></path>
                 </svg>
-                <span className="text-lg font-semibold">生成成功！</span>
+                <span className="text-lg font-semibold">{floatingMessage}</span>
               </div>
             </div>
           )}
 
           <Card className="mb-4">
             <CardHeader
-              className="cursor-pointer"
+              className="cursor-pointer pb-0"
               onClick={() => setIsDataExpanded(!isDataExpanded)}
             >
               <CardTitle className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
+                <div className="flex items-center gap-2">
                   <span>数据输入</span>
                   <Button
                     onClick={(e) => {
@@ -324,15 +319,10 @@ export default function LotteryApp() {
                     生成一万组
                   </Button>
                 </div>
-                <span className="text-sm text-gray-500">
-                  {isDataExpanded ? "点击收起" : "点击展开"}
-                  {inputData &&
-                    ` (已输入${
-                      inputData
-                        .trim()
-                        .split(/\s+/)
-                        .filter((num) => /^\d{4}$/.test(num)).length
-                    }组数据)`}
+                <span className="text-sm text-gray-500 min-w-0 shrink">
+                  <span className="block">
+                    {isDataExpanded ? "点击收起" : "点击展开"}
+                  </span>
                 </span>
               </CardTitle>
             </CardHeader>
@@ -342,15 +332,19 @@ export default function LotteryApp() {
                   value={inputData}
                   onChange={(e) => setInputData(e.target.value)}
                   placeholder="请输入四位数字组合，用空格分隔，例如：3853 4564 0637"
-                  className="h-32 text-lg resize-none overflow-y-auto"
+                  className="whitespace-pre-wrap h-32 text-sm resize-none overflow-y-auto"
+                  style={{
+                    fontFamily:
+                      'ui-monospace, SFMono-Regular, "SF Mono", Consolas, "Liberation Mono", Menlo, monospace',
+                  }}
                 />
               </CardContent>
             )}
           </Card>
 
           {/* 数字排除选择区 */}
-          <Card className="mb-15">
-            <CardContent className="pt-0 pb-0 px-1">
+          <Card className="mb-3">
+            <CardContent className="pt-0 pb-0 px-1 sm:px-4">
               {renderNumberButtons("thousands", "杀千")}
               {renderNumberButtons("hundreds", "杀百")}
               {renderNumberButtons("tens", "杀十")}
@@ -367,15 +361,6 @@ export default function LotteryApp() {
               </div>
             </CardContent>
           </Card>
-
-          {/* 成功提示 */}
-          {showSuccess && (
-            <Alert className="mt-4 bg-green-100 border-green-400">
-              <AlertDescription className="text-green-800">
-                筛选成功！共筛选出 {processedData.length} 组数据。
-              </AlertDescription>
-            </Alert>
-          )}
 
           {/* 错误提示 */}
           {errorMessage && (
@@ -411,27 +396,16 @@ export default function LotteryApp() {
             >
               {importSuccess ? `已导入${importedCount}组` : "导入txt数据"}
             </Button>
+
             <Button
-              onClick={generateData}
+              onClick={generateAndPreview}
               disabled={!inputData.trim()}
-              className={`px-4 sm:px-8 py-3 text-base sm:text-lg disabled:bg-gray-400 transition-colors ${
-                generateSuccess
-                  ? "bg-green-500 hover:bg-green-600 text-white"
-                  : "bg-red-500 hover:bg-red-600 text-white"
-              }`}
+              className="bg-red-500 hover:bg-red-600 text-white px-4 sm:px-8 py-3 text-base sm:text-lg disabled:bg-gray-400"
             >
-              {generateSuccess ? "成功生成" : "生成数据"}
+              预览筛选
             </Button>
 
             <Dialog open={showPreview} onOpenChange={setShowPreview}>
-              <DialogTrigger asChild>
-                <Button
-                  disabled={processedData.length === 0}
-                  className="bg-red-500 hover:bg-red-600 text-white px-4 sm:px-8 py-3 text-base sm:text-lg disabled:bg-gray-400"
-                >
-                  导出数据
-                </Button>
-              </DialogTrigger>
               <DialogContent className="max-w-2xl max-h-96 gap-0 overflow-hidden">
                 <DialogTitle className="text-lg font-semibold">
                   数据预览

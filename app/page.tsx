@@ -129,6 +129,8 @@ export default function LotteryApp() {
       hundredsUnits: new Set<number>(),
       tensUnits: new Set<number>(),
     });
+    setExcludeFourSame(false);
+    setExcludeThreeConsecutiveSame(false);
     setErrorMessage("");
     setImportSuccess(false);
     setImportedCount(0);
@@ -374,7 +376,7 @@ export default function LotteryApp() {
             <Button
               key={num}
               onClick={() => toggleExcluded(position, num)}
-              className={`w-8 h-8 sm:w-12 sm:h-12 text-xs sm:text-sm font-semibold transition-colors ${
+              className={`w-8 h-8 sm:w-12 sm:h-12 text-xs sm:text-lg font-semibold transition-colors ${
                 excludedNumbers[position].has(num)
                   ? "bg-red-500 hover:bg-red-600 text-white"
                   : "bg-orange-400 hover:bg-orange-500 text-white"
@@ -467,10 +469,10 @@ export default function LotteryApp() {
                   <span className="font-medium mr-2 sm:mr-4 w-12 sm:w-16 shrink-0 text-right text-sm sm:text-lg">
                     杀连号
                   </span>
-                  <div className="flex gap-2 flex-1">
+                  <div className="flex gap-1 flex-1 sm:gap-2">
                     <Button
                       onClick={() => setExcludeFourSame((v) => !v)}
-                      className={`w-24 h-10 sm:w-28 sm:h-12 text-sm sm:text-lg font-semibold transition-colors ${
+                      className={`w-21 h-10 sm:w-26 sm:h-12 text-sm sm:text-lg font-semibold transition-colors ${
                         excludeFourSame
                           ? "bg-red-500 hover:bg-red-600 text-white"
                           : "bg-orange-400 hover:bg-orange-500 text-white"
@@ -480,7 +482,7 @@ export default function LotteryApp() {
                     </Button>
                     <Button
                       onClick={() => setExcludeThreeConsecutiveSame((v) => !v)}
-                      className={`w-24 h-10 sm:w-28 sm:h-12 text-sm sm:text-lg font-semibold transition-colors ${
+                      className={`w-21 h-10 sm:w-26 sm:h-12 text-sm sm:text-lg font-semibold transition-colors ${
                         excludeThreeConsecutiveSame
                           ? "bg-red-500 hover:bg-red-600 text-white"
                           : "bg-orange-400 hover:bg-orange-500 text-white"

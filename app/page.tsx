@@ -394,7 +394,7 @@ export default function LotteryApp() {
     <div className="min-h-screen bg-gray-50 font-bold">
       {/* 主内容区域，添加底部间距以避免被固定按钮遮挡 */}
       <div className="pt-4 px-2 pb-40 sm:pb-10 sm:px-5">
-        <div className="max-w-6xl mx-auto">
+        <div className="max-w-296 mx-auto">
           {/* 浮动成功提示 */}
           {showFloatingSuccess && (
             <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-9999 bg-green-500 text-white px-8 py-4 rounded-lg shadow-lg transition-all duration-300 ease-in-out">
@@ -449,7 +449,7 @@ export default function LotteryApp() {
                 <Textarea
                   value={inputData}
                   onChange={(e) => setInputData(e.target.value)}
-                  placeholder="请输入四位数字组合，用空格分隔，例如：3853 4564 0637"
+                  placeholder="点击<生成一万组>按钮,或者手动输入四位数字组合，用空格分隔，例如：3853 4564 0637.或者点击<导入txt数据>"
                   className="whitespace-pre-wrap h-32 text-sm resize-none overflow-y-auto"
                   style={{
                     fontFamily:

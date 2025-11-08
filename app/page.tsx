@@ -13,6 +13,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { Separator } from "@/components/ui/separator";
 
 export default function LotteryApp() {
   const [inputData, setInputData] = useState("");
@@ -74,11 +75,20 @@ export default function LotteryApp() {
 
           // 显示浮动成功提示
           showSuccessMessage("导入成功！");
+
+          // 清空文件输入值，允许重复选择同一文件
+          if (fileInputRef.current) {
+            fileInputRef.current.value = "";
+          }
         };
         reader.readAsText(file);
       } else {
         setErrorMessage("请选择txt格式的文件");
         setTimeout(() => setErrorMessage(""), 3000);
+        // 清空文件输入值
+        if (fileInputRef.current) {
+          fileInputRef.current.value = "";
+        }
       }
     }
   };
@@ -139,6 +149,22 @@ export default function LotteryApp() {
     link.click();
     URL.revokeObjectURL(url);
     setShowPreview(false);
+  };
+
+  // 复制数据到剪贴板
+  const copyData = async () => {
+    try {
+      const dataStr = processedData.join(" ");
+      await navigator.clipboard.writeText(dataStr);
+      // 确保对话框不会干扰提示
+      setTimeout(() => {
+        showSuccessMessage("复制成功！");
+      }, 100);
+    } catch (err) {
+      console.error("复制失败:", err);
+      setErrorMessage("复制失败，请手动复制");
+      setTimeout(() => setErrorMessage(""), 3000);
+    }
   };
 
   // 生成一万组数据（0000-9999的所有组合）
@@ -329,7 +355,7 @@ export default function LotteryApp() {
         <div className="max-w-6xl mx-auto">
           {/* 浮动成功提示 */}
           {showFloatingSuccess && (
-            <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-50 bg-green-500 text-white px-8 py-4 rounded-lg shadow-lg transition-all duration-300 ease-in-out">
+            <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-9999 bg-green-500 text-white px-8 py-4 rounded-lg shadow-lg transition-all duration-300 ease-in-out">
               <div className="flex items-center gap-2">
                 <svg
                   className="w-6 h-6"
@@ -364,7 +390,7 @@ export default function LotteryApp() {
                       generateAllData();
                     }}
                     size="sm"
-                    className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 text mr-4"
+                    className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 mr-4"
                   >
                     生成一万组
                   </Button>
@@ -399,6 +425,7 @@ export default function LotteryApp() {
               {renderNumberButtons("hundreds", "杀百")}
               {renderNumberButtons("tens", "杀十")}
               {renderNumberButtons("units", "杀个")}
+              <Separator className="my-4" />
 
               {/* 千百、千十、千个等组合 */}
               <div className="space-y-6">
@@ -476,10 +503,16 @@ export default function LotteryApp() {
                         取消
                       </Button>
                       <Button
+                        onClick={copyData}
+                        className="bg-green-500 hover:bg-green-600"
+                      >
+                        复制
+                      </Button>
+                      <Button
                         onClick={exportData}
                         className="bg-green-500 hover:bg-green-600"
                       >
-                        确认导出
+                        导出
                       </Button>
                     </div>
                   </div>

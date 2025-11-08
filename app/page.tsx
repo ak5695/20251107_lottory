@@ -30,6 +30,10 @@ export default function LotteryApp() {
     hundredsUnits: new Set<number>(),
     tensUnits: new Set<number>(),
   });
+  // 杀常规类别状态
+  const [excludeFourSame, setExcludeFourSame] = useState(false);
+  const [excludeThreeConsecutiveSame, setExcludeThreeConsecutiveSame] =
+    useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [isDataExpanded, setIsDataExpanded] = useState(true);
@@ -200,6 +204,24 @@ export default function LotteryApp() {
       const digits = num.split("").map(Number);
       const [thousands, hundreds, tens, units] = digits;
 
+      // 杀四连号：四个数字都相同
+      if (
+        excludeFourSame &&
+        thousands === hundreds &&
+        hundreds === tens &&
+        tens === units
+      ) {
+        return false;
+      }
+      // 杀三连号：有连续三个数字相同
+      if (
+        excludeThreeConsecutiveSame &&
+        ((thousands === hundreds && hundreds === tens) ||
+          (hundreds === tens && tens === units))
+      ) {
+        return false;
+      }
+
       // 检查单个位置的排除
       if (
         excludedNumbers.thousands.has(thousands) ||
@@ -251,6 +273,24 @@ export default function LotteryApp() {
     const filtered = numbers.filter((num) => {
       const digits = num.split("").map(Number);
       const [thousands, hundreds, tens, units] = digits;
+
+      // 杀四连号：四个数字都相同
+      if (
+        excludeFourSame &&
+        thousands === hundreds &&
+        hundreds === tens &&
+        tens === units
+      ) {
+        return false;
+      }
+      // 杀三连号：有连续三个数字相同
+      if (
+        excludeThreeConsecutiveSame &&
+        ((thousands === hundreds && hundreds === tens) ||
+          (hundreds === tens && tens === units))
+      ) {
+        return false;
+      }
 
       // 检查单个位置的排除
       if (
@@ -421,6 +461,37 @@ export default function LotteryApp() {
           {/* 数字排除选择区 */}
           <Card className="mb-3">
             <CardContent className="pt-0 pb-0 px-1 sm:px-4">
+              {/* 杀常规类别 */}
+              <div className="mb-6">
+                <div className="flex items-center mb-3">
+                  <span className="font-medium mr-2 sm:mr-4 w-12 sm:w-16 shrink-0 text-right text-sm sm:text-lg">
+                    杀连号
+                  </span>
+                  <div className="flex gap-2 flex-1">
+                    <Button
+                      onClick={() => setExcludeFourSame((v) => !v)}
+                      className={`w-24 h-10 sm:w-28 sm:h-12 text-sm sm:text-lg font-semibold transition-colors ${
+                        excludeFourSame
+                          ? "bg-red-500 hover:bg-red-600 text-white"
+                          : "bg-orange-400 hover:bg-orange-500 text-white"
+                      }`}
+                    >
+                      四连号
+                    </Button>
+                    <Button
+                      onClick={() => setExcludeThreeConsecutiveSame((v) => !v)}
+                      className={`w-24 h-10 sm:w-28 sm:h-12 text-sm sm:text-lg font-semibold transition-colors ${
+                        excludeThreeConsecutiveSame
+                          ? "bg-red-500 hover:bg-red-600 text-white"
+                          : "bg-orange-400 hover:bg-orange-500 text-white"
+                      }`}
+                    >
+                      三连号
+                    </Button>
+                  </div>
+                </div>
+              </div>
+
               {renderNumberButtons("thousands", "杀千")}
               {renderNumberButtons("hundreds", "杀百")}
               {renderNumberButtons("tens", "杀十")}

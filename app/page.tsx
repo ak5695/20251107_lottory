@@ -588,7 +588,7 @@ export default function LotteryApp() {
                   </div>
                 </div>
               </div>
-
+              <Separator className="my-4" />
               {renderNumberButtons("thousands", "杀千")}
               {renderNumberButtons("hundreds", "杀百")}
               {renderNumberButtons("tens", "杀十")}

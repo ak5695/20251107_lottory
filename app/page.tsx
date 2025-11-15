@@ -29,10 +29,17 @@ export default function LotteryApp() {
     hundredsTens: new Set<number>(),
     hundredsUnits: new Set<number>(),
     tensUnits: new Set<number>(),
+    // 三位数之和
+    thousandsHundredsTens: new Set<number>(),
+    thousandsHundredsUnits: new Set<number>(),
+    thousandsTensUnits: new Set<number>(),
+    hundredsTensUnits: new Set<number>(),
   });
   // 杀常规类别状态
   const [excludeFourSame, setExcludeFourSame] = useState(false);
   const [excludeThreeConsecutiveSame, setExcludeThreeConsecutiveSame] =
+    useState(false);
+  const [excludeTwoConsecutiveSame, setExcludeTwoConsecutiveSame] =
     useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
@@ -128,9 +135,15 @@ export default function LotteryApp() {
       hundredsTens: new Set<number>(),
       hundredsUnits: new Set<number>(),
       tensUnits: new Set<number>(),
+      // 三位数之和
+      thousandsHundredsTens: new Set<number>(),
+      thousandsHundredsUnits: new Set<number>(),
+      thousandsTensUnits: new Set<number>(),
+      hundredsTensUnits: new Set<number>(),
     });
     setExcludeFourSame(false);
     setExcludeThreeConsecutiveSame(false);
+    setExcludeTwoConsecutiveSame(false);
     setErrorMessage("");
     setImportSuccess(false);
     setImportedCount(0);
@@ -223,6 +236,13 @@ export default function LotteryApp() {
       ) {
         return false;
       }
+      // 杀二连号：有连续两个数字相同
+      if (
+        excludeTwoConsecutiveSame &&
+        (thousands === hundreds || hundreds === tens || tens === units)
+      ) {
+        return false;
+      }
 
       // 检查单个位置的排除
       if (
@@ -249,6 +269,21 @@ export default function LotteryApp() {
         excludedNumbers.hundredsTens.has(hundredsTens) ||
         excludedNumbers.hundredsUnits.has(hundredsUnits) ||
         excludedNumbers.tensUnits.has(tensUnits)
+      ) {
+        return false;
+      }
+
+      // 检查组合位置的排除（三位数字之和）
+      const thousandsHundredsTens = thousands + hundreds + tens;
+      const thousandsHundredsUnits = thousands + hundreds + units;
+      const thousandsTensUnits = thousands + tens + units;
+      const hundredsTensUnits = hundreds + tens + units;
+
+      if (
+        excludedNumbers.thousandsHundredsTens.has(thousandsHundredsTens) ||
+        excludedNumbers.thousandsHundredsUnits.has(thousandsHundredsUnits) ||
+        excludedNumbers.thousandsTensUnits.has(thousandsTensUnits) ||
+        excludedNumbers.hundredsTensUnits.has(hundredsTensUnits)
       ) {
         return false;
       }
@@ -293,6 +328,13 @@ export default function LotteryApp() {
       ) {
         return false;
       }
+      // 杀二连号：有连续两个数字相同
+      if (
+        excludeTwoConsecutiveSame &&
+        (thousands === hundreds || hundreds === tens || tens === units)
+      ) {
+        return false;
+      }
 
       // 检查单个位置的排除
       if (
@@ -319,6 +361,21 @@ export default function LotteryApp() {
         excludedNumbers.hundredsTens.has(hundredsTens) ||
         excludedNumbers.hundredsUnits.has(hundredsUnits) ||
         excludedNumbers.tensUnits.has(tensUnits)
+      ) {
+        return false;
+      }
+
+      // 检查组合位置的排除（三位数字之和）
+      const thousandsHundredsTens = thousands + hundreds + tens;
+      const thousandsHundredsUnits = thousands + hundreds + units;
+      const thousandsTensUnits = thousands + tens + units;
+      const hundredsTensUnits = hundreds + tens + units;
+
+      if (
+        excludedNumbers.thousandsHundredsTens.has(thousandsHundredsTens) ||
+        excludedNumbers.thousandsHundredsUnits.has(thousandsHundredsUnits) ||
+        excludedNumbers.thousandsTensUnits.has(thousandsTensUnits) ||
+        excludedNumbers.hundredsTensUnits.has(hundredsTensUnits)
       ) {
         return false;
       }
@@ -373,6 +430,34 @@ export default function LotteryApp() {
           {[
             0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18,
           ].map((num) => (
+            <Button
+              key={num}
+              onClick={() => toggleExcluded(position, num)}
+              className={`w-8 h-8 sm:w-12 sm:h-12 text-xs sm:text-lg font-semibold transition-colors ${
+                excludedNumbers[position].has(num)
+                  ? "bg-red-500 hover:bg-red-600 text-white"
+                  : "bg-orange-400 hover:bg-orange-500 text-white"
+              }`}
+            >
+              {num}
+            </Button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderThreeDigitSumButtons = (
+    position: keyof typeof excludedNumbers,
+    label: string
+  ) => (
+    <div className="mb-6">
+      <div className="flex items-start mb-3">
+        <span className="font-medium mr-2 sm:mr-4 w-12 sm:w-16 shrink-0 text-right text-xs sm:text-lg">
+          {label}
+        </span>
+        <div className="flex flex-wrap gap-1 sm:gap-2 flex-1">
+          {Array.from({ length: 28 }, (_, i) => i).map((num) => (
             <Button
               key={num}
               onClick={() => toggleExcluded(position, num)}
@@ -490,6 +575,16 @@ export default function LotteryApp() {
                     >
                       三连号
                     </Button>
+                    <Button
+                      onClick={() => setExcludeTwoConsecutiveSame((v) => !v)}
+                      className={`w-21 h-10 sm:w-26 sm:h-12 text-sm sm:text-lg font-semibold transition-colors ${
+                        excludeTwoConsecutiveSame
+                          ? "bg-red-500 hover:bg-red-600 text-white"
+                          : "bg-orange-400 hover:bg-orange-500 text-white"
+                      }`}
+                    >
+                      二连号
+                    </Button>
                   </div>
                 </div>
               </div>
@@ -508,6 +603,22 @@ export default function LotteryApp() {
                 {renderCombinationButtons("hundredsTens", "杀百十")}
                 {renderCombinationButtons("hundredsUnits", "杀百个")}
                 {renderCombinationButtons("tensUnits", "杀十个")}
+              </div>
+
+              <Separator className="my-4" />
+
+              {/* 三位数之和组合 */}
+              <div className="space-y-6">
+                {renderThreeDigitSumButtons(
+                  "thousandsHundredsTens",
+                  "杀千百十"
+                )}
+                {renderThreeDigitSumButtons(
+                  "thousandsHundredsUnits",
+                  "杀千百个"
+                )}
+                {renderThreeDigitSumButtons("thousandsTensUnits", "杀千十个")}
+                {renderThreeDigitSumButtons("hundredsTensUnits", "杀百十个")}
               </div>
             </CardContent>
           </Card>

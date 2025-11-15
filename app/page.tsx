@@ -35,12 +35,18 @@ export default function LotteryApp() {
     thousandsTensUnits: new Set<number>(),
     hundredsTensUnits: new Set<number>(),
   });
-  // 杀常规类别状态
-  const [excludeFourSame, setExcludeFourSame] = useState(false);
-  const [excludeThreeConsecutiveSame, setExcludeThreeConsecutiveSame] =
-    useState(false);
-  const [excludeTwoConsecutiveSame, setExcludeTwoConsecutiveSame] =
-    useState(false);
+  // 杀连号类别状态 - 存储要排除的连号数字
+  const [excludeFourSameNumbers, setExcludeFourSameNumbers] = useState<
+    Set<number>
+  >(new Set());
+  const [
+    excludeThreeConsecutiveSameNumbers,
+    setExcludeThreeConsecutiveSameNumbers,
+  ] = useState<Set<number>>(new Set());
+  const [
+    excludeTwoConsecutiveSameNumbers,
+    setExcludeTwoConsecutiveSameNumbers,
+  ] = useState<Set<number>>(new Set());
   const [showPreview, setShowPreview] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [isDataExpanded, setIsDataExpanded] = useState(true);
@@ -141,9 +147,9 @@ export default function LotteryApp() {
       thousandsTensUnits: new Set<number>(),
       hundredsTensUnits: new Set<number>(),
     });
-    setExcludeFourSame(false);
-    setExcludeThreeConsecutiveSame(false);
-    setExcludeTwoConsecutiveSame(false);
+    setExcludeFourSameNumbers(new Set());
+    setExcludeThreeConsecutiveSameNumbers(new Set());
+    setExcludeTwoConsecutiveSameNumbers(new Set());
     setErrorMessage("");
     setImportSuccess(false);
     setImportedCount(0);
@@ -204,6 +210,35 @@ export default function LotteryApp() {
     showSuccessMessage("生成成功！");
   };
 
+  // 检查是否包含特定数字的连号
+  const hasConsecutiveSameDigit = (
+    digits: number[],
+    targetDigit: number,
+    count: number
+  ): boolean => {
+    if (count === 4) {
+      return digits.every((d) => d === targetDigit);
+    } else if (count === 3) {
+      const [thousands, hundreds, tens, units] = digits;
+      return (
+        (thousands === targetDigit &&
+          hundreds === targetDigit &&
+          tens === targetDigit) ||
+        (hundreds === targetDigit &&
+          tens === targetDigit &&
+          units === targetDigit)
+      );
+    } else if (count === 2) {
+      const [thousands, hundreds, tens, units] = digits;
+      return (
+        (thousands === targetDigit && hundreds === targetDigit) ||
+        (hundreds === targetDigit && tens === targetDigit) ||
+        (tens === targetDigit && units === targetDigit)
+      );
+    }
+    return false;
+  };
+
   // 实时计算筛选后的组数
   const calculateFilteredCount = () => {
     if (!inputData.trim()) return 0;
@@ -219,29 +254,25 @@ export default function LotteryApp() {
       const digits = num.split("").map(Number);
       const [thousands, hundreds, tens, units] = digits;
 
-      // 杀四连号：四个数字都相同
-      if (
-        excludeFourSame &&
-        thousands === hundreds &&
-        hundreds === tens &&
-        tens === units
-      ) {
-        return false;
+      // 杀四连号：检查是否包含指定数字的四连号
+      for (const digit of excludeFourSameNumbers) {
+        if (hasConsecutiveSameDigit(digits, digit, 4)) {
+          return false;
+        }
       }
-      // 杀三连号：有连续三个数字相同
-      if (
-        excludeThreeConsecutiveSame &&
-        ((thousands === hundreds && hundreds === tens) ||
-          (hundreds === tens && tens === units))
-      ) {
-        return false;
+
+      // 杀三连号：检查是否包含指定数字的三连号
+      for (const digit of excludeThreeConsecutiveSameNumbers) {
+        if (hasConsecutiveSameDigit(digits, digit, 3)) {
+          return false;
+        }
       }
-      // 杀二连号：有连续两个数字相同
-      if (
-        excludeTwoConsecutiveSame &&
-        (thousands === hundreds || hundreds === tens || tens === units)
-      ) {
-        return false;
+
+      // 杀二连号：检查是否包含指定数字的二连号
+      for (const digit of excludeTwoConsecutiveSameNumbers) {
+        if (hasConsecutiveSameDigit(digits, digit, 2)) {
+          return false;
+        }
       }
 
       // 检查单个位置的排除
@@ -311,29 +342,25 @@ export default function LotteryApp() {
       const digits = num.split("").map(Number);
       const [thousands, hundreds, tens, units] = digits;
 
-      // 杀四连号：四个数字都相同
-      if (
-        excludeFourSame &&
-        thousands === hundreds &&
-        hundreds === tens &&
-        tens === units
-      ) {
-        return false;
+      // 杀四连号：检查是否包含指定数字的四连号
+      for (const digit of excludeFourSameNumbers) {
+        if (hasConsecutiveSameDigit(digits, digit, 4)) {
+          return false;
+        }
       }
-      // 杀三连号：有连续三个数字相同
-      if (
-        excludeThreeConsecutiveSame &&
-        ((thousands === hundreds && hundreds === tens) ||
-          (hundreds === tens && tens === units))
-      ) {
-        return false;
+
+      // 杀三连号：检查是否包含指定数字的三连号
+      for (const digit of excludeThreeConsecutiveSameNumbers) {
+        if (hasConsecutiveSameDigit(digits, digit, 3)) {
+          return false;
+        }
       }
-      // 杀二连号：有连续两个数字相同
-      if (
-        excludeTwoConsecutiveSame &&
-        (thousands === hundreds || hundreds === tens || tens === units)
-      ) {
-        return false;
+
+      // 杀二连号：检查是否包含指定数字的二连号
+      for (const digit of excludeTwoConsecutiveSameNumbers) {
+        if (hasConsecutiveSameDigit(digits, digit, 2)) {
+          return false;
+        }
       }
 
       // 检查单个位置的排除
@@ -475,6 +502,106 @@ export default function LotteryApp() {
     </div>
   );
 
+  // 切换连号数字的排除状态
+  const toggleConsecutiveDigit = (
+    type: "four" | "three" | "two",
+    digit: number
+  ) => {
+    if (type === "four") {
+      const newSet = new Set(excludeFourSameNumbers);
+      if (newSet.has(digit)) {
+        newSet.delete(digit);
+      } else {
+        newSet.add(digit);
+      }
+      setExcludeFourSameNumbers(newSet);
+    } else if (type === "three") {
+      const newSet = new Set(excludeThreeConsecutiveSameNumbers);
+      if (newSet.has(digit)) {
+        newSet.delete(digit);
+      } else {
+        newSet.add(digit);
+      }
+      setExcludeThreeConsecutiveSameNumbers(newSet);
+    } else if (type === "two") {
+      const newSet = new Set(excludeTwoConsecutiveSameNumbers);
+      if (newSet.has(digit)) {
+        newSet.delete(digit);
+      } else {
+        newSet.add(digit);
+      }
+      setExcludeTwoConsecutiveSameNumbers(newSet);
+    }
+  };
+
+  // 切换全部连号的排除状态
+  const toggleAllConsecutive = (type: "four" | "three" | "two") => {
+    const allDigits = new Set([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
+
+    if (type === "four") {
+      const isAllSelected = [...allDigits].every((digit) =>
+        excludeFourSameNumbers.has(digit)
+      );
+      setExcludeFourSameNumbers(isAllSelected ? new Set() : allDigits);
+    } else if (type === "three") {
+      const isAllSelected = [...allDigits].every((digit) =>
+        excludeThreeConsecutiveSameNumbers.has(digit)
+      );
+      setExcludeThreeConsecutiveSameNumbers(
+        isAllSelected ? new Set() : allDigits
+      );
+    } else if (type === "two") {
+      const isAllSelected = [...allDigits].every((digit) =>
+        excludeTwoConsecutiveSameNumbers.has(digit)
+      );
+      setExcludeTwoConsecutiveSameNumbers(
+        isAllSelected ? new Set() : allDigits
+      );
+    }
+  };
+
+  // 渲染连号选择按钮
+  const renderConsecutiveButtons = (
+    type: "four" | "three" | "two",
+    label: string,
+    excludedSet: Set<number>
+  ) => (
+    <div className="mb-6">
+      <div className="flex items-start mb-3">
+        <span className="font-medium mr-2 sm:mr-4 w-12 sm:w-16 shrink-0 text-right text-xs sm:text-sm">
+          {label}
+        </span>
+        <div className="flex flex-wrap gap-1 sm:gap-2 flex-1">
+          {/* 全部按钮 */}
+          <Button
+            onClick={() => toggleAllConsecutive(type)}
+            className={`w-10 h-10 sm:w-12 sm:h-12 text-xs sm:text-sm font-semibold transition-colors ${
+              [...Array(10)].every((_, i) => excludedSet.has(i))
+                ? "bg-red-500 hover:bg-red-600 text-white"
+                : "bg-orange-400 hover:bg-orange-500 text-white"
+            }`}
+          >
+            全部
+          </Button>
+          {/* 0-9数字按钮 */}
+          {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map((digit) => (
+            <Button
+              key={digit}
+              onClick={() => toggleConsecutiveDigit(type, digit)}
+              className={`w-10 h-10 sm:w-12 sm:h-12 text-sm sm:text-lg font-semibold transition-colors ${
+                excludedSet.has(digit)
+                  ? "bg-red-500 hover:bg-red-600 text-white"
+                  : "bg-orange-400 hover:bg-orange-500 text-white"
+              }`}
+            >
+              {digit}
+            </Button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+
   return (
     <div className="min-h-screen bg-gray-50 font-bold">
       {/* 主内容区域，添加底部间距以避免被固定按钮遮挡 */}
@@ -548,46 +675,23 @@ export default function LotteryApp() {
           {/* 数字排除选择区 */}
           <Card className="mb-3">
             <CardContent className="pt-0 pb-0 px-1 sm:px-4">
-              {/* 杀常规类别 */}
-              <div className="mb-6">
-                <div className="flex items-center mb-3">
-                  <span className="font-medium mr-2 sm:mr-4 w-12 sm:w-16 shrink-0 text-right text-sm sm:text-lg">
-                    杀连号
-                  </span>
-                  <div className="flex gap-1 flex-1 sm:gap-2">
-                    <Button
-                      onClick={() => setExcludeFourSame((v) => !v)}
-                      className={`w-21 h-10 sm:w-26 sm:h-12 text-sm sm:text-lg font-semibold transition-colors ${
-                        excludeFourSame
-                          ? "bg-red-500 hover:bg-red-600 text-white"
-                          : "bg-orange-400 hover:bg-orange-500 text-white"
-                      }`}
-                    >
-                      四连号
-                    </Button>
-                    <Button
-                      onClick={() => setExcludeThreeConsecutiveSame((v) => !v)}
-                      className={`w-21 h-10 sm:w-26 sm:h-12 text-sm sm:text-lg font-semibold transition-colors ${
-                        excludeThreeConsecutiveSame
-                          ? "bg-red-500 hover:bg-red-600 text-white"
-                          : "bg-orange-400 hover:bg-orange-500 text-white"
-                      }`}
-                    >
-                      三连号
-                    </Button>
-                    <Button
-                      onClick={() => setExcludeTwoConsecutiveSame((v) => !v)}
-                      className={`w-21 h-10 sm:w-26 sm:h-12 text-sm sm:text-lg font-semibold transition-colors ${
-                        excludeTwoConsecutiveSame
-                          ? "bg-red-500 hover:bg-red-600 text-white"
-                          : "bg-orange-400 hover:bg-orange-500 text-white"
-                      }`}
-                    >
-                      二连号
-                    </Button>
-                  </div>
-                </div>
-              </div>
+              {/* 杀连号类别 */}
+              {renderConsecutiveButtons(
+                "four",
+                "杀四连号",
+                excludeFourSameNumbers
+              )}
+              {renderConsecutiveButtons(
+                "three",
+                "杀三连号",
+                excludeThreeConsecutiveSameNumbers
+              )}
+              {renderConsecutiveButtons(
+                "two",
+                "杀二连号",
+                excludeTwoConsecutiveSameNumbers
+              )}
+
               <Separator className="my-4" />
               {renderNumberButtons("thousands", "杀千")}
               {renderNumberButtons("hundreds", "杀百")}

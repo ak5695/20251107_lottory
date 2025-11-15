@@ -35,7 +35,7 @@ export default function LotteryApp() {
     thousandsTensUnits: new Set<number>(),
     hundredsTensUnits: new Set<number>(),
   });
-  // 杀连号类别状态 - 存储要排除的连号数字
+  // 去连号类别状态 - 存储要排除的连号数字
   const [excludeFourSameNumbers, setExcludeFourSameNumbers] = useState<
     Set<number>
   >(new Set());
@@ -254,21 +254,21 @@ export default function LotteryApp() {
       const digits = num.split("").map(Number);
       const [thousands, hundreds, tens, units] = digits;
 
-      // 杀四连号：检查是否包含指定数字的四连号
+      // 去四连号：检查是否包含指定数字的四连号
       for (const digit of excludeFourSameNumbers) {
         if (hasConsecutiveSameDigit(digits, digit, 4)) {
           return false;
         }
       }
 
-      // 杀三连号：检查是否包含指定数字的三连号
+      // 去三连号：检查是否包含指定数字的三连号
       for (const digit of excludeThreeConsecutiveSameNumbers) {
         if (hasConsecutiveSameDigit(digits, digit, 3)) {
           return false;
         }
       }
 
-      // 杀二连号：检查是否包含指定数字的二连号
+      // 去二连号：检查是否包含指定数字的二连号
       for (const digit of excludeTwoConsecutiveSameNumbers) {
         if (hasConsecutiveSameDigit(digits, digit, 2)) {
           return false;
@@ -342,21 +342,21 @@ export default function LotteryApp() {
       const digits = num.split("").map(Number);
       const [thousands, hundreds, tens, units] = digits;
 
-      // 杀四连号：检查是否包含指定数字的四连号
+      // 去四连号：检查是否包含指定数字的四连号
       for (const digit of excludeFourSameNumbers) {
         if (hasConsecutiveSameDigit(digits, digit, 4)) {
           return false;
         }
       }
 
-      // 杀三连号：检查是否包含指定数字的三连号
+      // 去三连号：检查是否包含指定数字的三连号
       for (const digit of excludeThreeConsecutiveSameNumbers) {
         if (hasConsecutiveSameDigit(digits, digit, 3)) {
           return false;
         }
       }
 
-      // 杀二连号：检查是否包含指定数字的二连号
+      // 去二连号：检查是否包含指定数字的二连号
       for (const digit of excludeTwoConsecutiveSameNumbers) {
         if (hasConsecutiveSameDigit(digits, digit, 2)) {
           return false;
@@ -675,38 +675,38 @@ export default function LotteryApp() {
           {/* 数字排除选择区 */}
           <Card className="mb-3">
             <CardContent className="pt-0 pb-0 px-1 sm:px-4">
-              {/* 杀连号类别 */}
+              {/* 去连号类别 */}
               {renderConsecutiveButtons(
                 "four",
-                "杀四连号",
+                "去四连号",
                 excludeFourSameNumbers
               )}
               {renderConsecutiveButtons(
                 "three",
-                "杀三连号",
+                "去三连号",
                 excludeThreeConsecutiveSameNumbers
               )}
               {renderConsecutiveButtons(
                 "two",
-                "杀二连号",
+                "去二连号",
                 excludeTwoConsecutiveSameNumbers
               )}
 
               <Separator className="my-4" />
-              {renderNumberButtons("thousands", "杀千")}
-              {renderNumberButtons("hundreds", "杀百")}
-              {renderNumberButtons("tens", "杀十")}
-              {renderNumberButtons("units", "杀个")}
+              {renderNumberButtons("thousands", "去千")}
+              {renderNumberButtons("hundreds", "去百")}
+              {renderNumberButtons("tens", "去十")}
+              {renderNumberButtons("units", "去个")}
               <Separator className="my-4" />
 
               {/* 千百、千十、千个等组合 */}
               <div className="space-y-6">
-                {renderCombinationButtons("thousandsHundreds", "杀千百")}
-                {renderCombinationButtons("thousandsTens", "杀千十")}
-                {renderCombinationButtons("thousandsUnits", "杀千个")}
-                {renderCombinationButtons("hundredsTens", "杀百十")}
-                {renderCombinationButtons("hundredsUnits", "杀百个")}
-                {renderCombinationButtons("tensUnits", "杀十个")}
+                {renderCombinationButtons("thousandsHundreds", "去千百")}
+                {renderCombinationButtons("thousandsTens", "去千十")}
+                {renderCombinationButtons("thousandsUnits", "去千个")}
+                {renderCombinationButtons("hundredsTens", "去百十")}
+                {renderCombinationButtons("hundredsUnits", "去百个")}
+                {renderCombinationButtons("tensUnits", "去十个")}
               </div>
 
               <Separator className="my-4" />
@@ -715,14 +715,14 @@ export default function LotteryApp() {
               <div className="space-y-6">
                 {renderThreeDigitSumButtons(
                   "thousandsHundredsTens",
-                  "杀千百十"
+                  "去千百十"
                 )}
                 {renderThreeDigitSumButtons(
                   "thousandsHundredsUnits",
-                  "杀千百个"
+                  "去千百个"
                 )}
-                {renderThreeDigitSumButtons("thousandsTensUnits", "杀千十个")}
-                {renderThreeDigitSumButtons("hundredsTensUnits", "杀百十个")}
+                {renderThreeDigitSumButtons("thousandsTensUnits", "去千十个")}
+                {renderThreeDigitSumButtons("hundredsTensUnits", "去百十个")}
               </div>
             </CardContent>
           </Card>

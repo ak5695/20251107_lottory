@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "知福筛选",
-  description: "知福筛选",
+  title: "智符筛选",
+  description: "智符筛选",
   icons: {
     icon: "/icon.png",
     shortcut: "/icon.png",

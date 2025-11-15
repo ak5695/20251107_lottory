@@ -453,7 +453,7 @@ export default function LotteryApp() {
   ) => (
     <div className="mb-6">
       <div className="flex items-start mb-3">
-        <span className="font-medium mr-2 sm:mr-4 w-12 sm:w-16 shrink-0 text-right text-xs sm:text-lg">
+        <span className="font-medium mr-2 sm:mr-4 w-12 sm:w-16 shrink-0 text-right text-xs sm:text-base">
           {label}
         </span>
         <div className="flex flex-wrap gap-1 sm:gap-2 flex-1">

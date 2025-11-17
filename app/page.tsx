@@ -21,6 +21,27 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 
+// 触感反馈函数
+const triggerHapticFeedback = (
+  type: "light" | "medium" | "heavy" = "light"
+) => {
+  // 检查是否支持触感反馈
+  if ("vibrate" in navigator) {
+    // 根据类型设置不同的震动强度
+    switch (type) {
+      case "light":
+        navigator.vibrate(10); // 轻微震动10ms
+        break;
+      case "medium":
+        navigator.vibrate(25); // 中等震动25ms
+        break;
+      case "heavy":
+        navigator.vibrate(50); // 较强震动50ms
+        break;
+    }
+  }
+};
+
 // 自定义移动端友好的Tooltip组件
 const MobileTooltip: React.FC<{
   children: React.ReactNode;
@@ -29,15 +50,25 @@ const MobileTooltip: React.FC<{
 }> = ({ children, content, className = "" }) => {
   const [isOpen, setIsOpen] = useState(false);
 
+  const handleClick = () => {
+    triggerHapticFeedback("light");
+    setIsOpen(!isOpen);
+  };
+
   return (
     <div className="relative inline-block">
       <div
-        className={`${className} cursor-help hover:text-blue-600 transition-colors`}
-        onClick={() => setIsOpen(!isOpen)}
+        className={`${className} cursor-help hover:text-blue-600 transition-colors active:scale-95 active:bg-blue-50 rounded-sm`}
+        onClick={handleClick}
         onMouseEnter={() => setIsOpen(true)}
         onMouseLeave={() => setIsOpen(false)}
         onBlur={() => setIsOpen(false)}
+        onTouchStart={() => triggerHapticFeedback("light")}
         tabIndex={0}
+        style={{
+          WebkitTapHighlightColor: "rgba(59, 130, 246, 0.1)",
+          touchAction: "manipulation",
+        }}
       >
         {children}
       </div>
@@ -55,6 +86,20 @@ const MobileTooltip: React.FC<{
 };
 
 export default function LotteryApp() {
+  // 使用移动端优化Hook
+  useMobileOptimization();
+
+  // 为按钮点击添加触感反馈的包装函数
+  const withHapticFeedback = (
+    callback: () => void,
+    feedbackType: "light" | "medium" | "heavy" = "light"
+  ) => {
+    return () => {
+      triggerHapticFeedback(feedbackType);
+      callback();
+    };
+  };
+
   const [inputData, setInputData] = useState("");
   const [processedData, setProcessedData] = useState<string[]>([]);
   const [excludedNumbers, setExcludedNumbers] = useState({
@@ -644,14 +689,22 @@ export default function LotteryApp() {
         <div className="flex flex-wrap gap-1 sm:gap-2 flex-1">
           {/* 全部按钮 */}
           <Button
-            onClick={() => toggleAllBasic(position, 9)}
-            className={`w-10 h-10 sm:w-12 sm:h-12 text-xs sm:text-sm font-semibold transition-colors ${
+            onClick={withHapticFeedback(
+              () => toggleAllBasic(position, 9),
+              "medium"
+            )}
+            onTouchStart={() => triggerHapticFeedback("light")}
+            className={`w-10 h-10 sm:w-12 sm:h-12 text-xs sm:text-sm font-semibold transition-all duration-150 active:scale-95 ${
               [0, 1, 2, 3, 4, 5, 6, 7, 8, 9].every((num) =>
                 excludedNumbers[position].has(num)
               )
                 ? "bg-red-500 hover:bg-red-600 text-white"
                 : "bg-orange-400 hover:bg-orange-500 text-white"
             }`}
+            style={{
+              WebkitTapHighlightColor: "rgba(239, 68, 68, 0.2)",
+              touchAction: "manipulation",
+            }}
           >
             全部
           </Button>
@@ -659,12 +712,20 @@ export default function LotteryApp() {
           {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map((num) => (
             <Button
               key={num}
-              onClick={() => toggleExcluded(position, num)}
-              className={`w-10 h-10 sm:w-12 sm:h-12 text-sm sm:text-lg font-semibold transition-colors ${
+              onClick={withHapticFeedback(
+                () => toggleExcluded(position, num),
+                "light"
+              )}
+              onTouchStart={() => triggerHapticFeedback("light")}
+              className={`w-10 h-10 sm:w-12 sm:h-12 text-sm sm:text-lg font-semibold transition-all duration-150 active:scale-95 ${
                 excludedNumbers[position].has(num)
                   ? "bg-red-500 hover:bg-red-600 text-white"
                   : "bg-orange-400 hover:bg-orange-500 text-white"
               }`}
+              style={{
+                WebkitTapHighlightColor: "rgba(239, 68, 68, 0.2)",
+                touchAction: "manipulation",
+              }}
             >
               {num}
             </Button>
@@ -1051,264 +1112,351 @@ export default function LotteryApp() {
   );
 
   return (
-    <TooltipProvider>
-      <div className="min-h-screen bg-gray-50 font-bold">
-        {/* 主内容区域，添加底部间距以避免被固定按钮遮挡 */}
-        <div className="pt-4 px-2 pb-40 sm:pb-10 sm:px-5">
-          <div className="max-w-308 mx-auto">
-            {/* 浮动成功提示 */}
-            {showFloatingSuccess && (
-              <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-9999 bg-green-500 text-white px-8 py-4 rounded-lg shadow-lg transition-all duration-300 ease-in-out">
-                <div className="flex items-center gap-2">
-                  <svg
-                    className="w-6 h-6"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                    xmlns="http://www.w3.org/2000/svg"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth="2"
-                      d="M5 13l4 4L19 7"
-                    ></path>
-                  </svg>
-                  <span className="text-lg font-semibold">
-                    {floatingMessage}
-                  </span>
-                </div>
-              </div>
-            )}
-
-            <Card className="mb-4">
-              <CardHeader
-                className="cursor-pointer pb-0"
-                onClick={() => setIsDataExpanded(!isDataExpanded)}
-              >
-                <CardTitle className="flex items-center justify-between">
+    <>
+      <GlobalMobileStyles />
+      <TooltipProvider>
+        <div className="min-h-screen bg-gray-50 font-bold">
+          {/* 主内容区域，添加底部间距以避免被固定按钮遮挡 */}
+          <div className="pt-4 px-2 pb-40 sm:pb-10 sm:px-5">
+            <div className="max-w-308 mx-auto">
+              {/* 浮动成功提示 */}
+              {showFloatingSuccess && (
+                <div className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-9999 bg-green-500 text-white px-8 py-4 rounded-lg shadow-lg transition-all duration-300 ease-in-out">
                   <div className="flex items-center gap-2">
-                    <span>数据输入</span>
-                    <Button
-                      onClick={(e) => {
-                        e.stopPropagation(); // 防止触发折叠/展开
-                        generateAllData();
-                      }}
-                      size="sm"
-                      className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 mr-4"
+                    <svg
+                      className="w-6 h-6"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                      xmlns="http://www.w3.org/2000/svg"
                     >
-                      生成一万组
-                    </Button>
-                  </div>
-                  <span className="text-sm text-gray-500 min-w-0 shrink">
-                    <span className="block">
-                      {isDataExpanded ? "点击收起" : "点击展开"}
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth="2"
+                        d="M5 13l4 4L19 7"
+                      ></path>
+                    </svg>
+                    <span className="text-lg font-semibold">
+                      {floatingMessage}
                     </span>
-                  </span>
-                </CardTitle>
-              </CardHeader>
-              {isDataExpanded && (
-                <CardContent className="pt-0">
-                  <Textarea
-                    value={inputData}
-                    onChange={(e) => setInputData(e.target.value)}
-                    placeholder="点击<生成一万组>按钮,或者手动输入四位数字组合，用空格分隔，例如：3853 4564 0637.或者点击<导入txt数据>"
-                    className="whitespace-pre-wrap h-32 text-sm resize-none overflow-y-auto"
-                    style={{
-                      fontFamily:
-                        'ui-monospace, SFMono-Regular, "SF Mono", Consolas, "Liberation Mono", Menlo, monospace',
-                    }}
-                  />
-                </CardContent>
+                  </div>
+                </div>
               )}
-            </Card>
 
-            {/* 数字排除选择区 */}
-            <Card className="mb-3">
-              <CardContent className="pt-0 pb-0 px-1 sm:px-4">
-                {/* 去连号类别 */}
-                {renderConsecutiveButtons(
-                  "four",
-                  "去四连",
-                  excludeFourSameNumbers
+              <Card className="mb-4">
+                <CardHeader
+                  className="cursor-pointer pb-0"
+                  onClick={() => setIsDataExpanded(!isDataExpanded)}
+                >
+                  <CardTitle className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span>数据输入</span>
+                      <Button
+                        onClick={(e) => {
+                          e.stopPropagation(); // 防止触发折叠/展开
+                          generateAllData();
+                        }}
+                        size="sm"
+                        className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 mr-4"
+                      >
+                        生成一万组
+                      </Button>
+                    </div>
+                    <span className="text-sm text-gray-500 min-w-0 shrink">
+                      <span className="block">
+                        {isDataExpanded ? "点击收起" : "点击展开"}
+                      </span>
+                    </span>
+                  </CardTitle>
+                </CardHeader>
+                {isDataExpanded && (
+                  <CardContent className="pt-0">
+                    <Textarea
+                      value={inputData}
+                      onChange={(e) => setInputData(e.target.value)}
+                      placeholder="点击<生成一万组>按钮,或者手动输入四位数字组合，用空格分隔，例如：3853 4564 0637.或者点击<导入txt数据>"
+                      className="whitespace-pre-wrap h-32 text-sm resize-none overflow-y-auto"
+                      style={{
+                        fontFamily:
+                          'ui-monospace, SFMono-Regular, "SF Mono", Consolas, "Liberation Mono", Menlo, monospace',
+                      }}
+                    />
+                  </CardContent>
                 )}
-                {renderConsecutiveButtons(
-                  "three",
-                  "去三连",
-                  excludeThreeConsecutiveSameNumbers
-                )}
-                {renderConsecutiveButtons(
-                  "two",
-                  "去二连",
-                  excludeTwoConsecutiveSameNumbers
-                )}
+              </Card>
 
-                <Separator className="my-4" />
-
-                {/* 新增：任意位相同 */}
-                {renderAnySameButtons(
-                  "anyThreeSame",
-                  "去三同",
-                  excludeAnyThreeSame
-                )}
-                {renderAnySameButtons(
-                  "anyTwoSame",
-                  "去两同",
-                  excludeAnyTwoSame
-                )}
-
-                <Separator className="my-4" />
-
-                {/* 新增：任意位求和 */}
-                {renderAnySumButtons(
-                  "anyThreeSum",
-                  "去三和",
-                  excludeAnyThreeSum,
-                  27
-                )}
-                {renderAnySumButtons(
-                  "anyTwoSum",
-                  "去两和",
-                  excludeAnyTwoSum,
-                  18
-                )}
-
-                <Separator className="my-4" />
-                {renderNumberButtons("thousands", "去千")}
-                {renderNumberButtons("hundreds", "去百")}
-                {renderNumberButtons("tens", "去十")}
-                {renderNumberButtons("units", "去个")}
-                <Separator className="my-4" />
-
-                {/* 千百、千十、千个等组合 */}
-                <div className="space-y-6">
-                  {renderCombinationButtons("thousandsHundreds", "去千百")}
-                  {renderCombinationButtons("thousandsTens", "去千十")}
-                  {renderCombinationButtons("thousandsUnits", "去千个")}
-                  {renderCombinationButtons("hundredsTens", "去百十")}
-                  {renderCombinationButtons("hundredsUnits", "去百个")}
-                  {renderCombinationButtons("tensUnits", "去十个")}
-                </div>
-
-                <Separator className="my-4" />
-
-                {/* 三位数之和组合 */}
-                <div className="space-y-6">
-                  {renderThreeDigitSumButtons(
-                    "thousandsHundredsTens",
-                    "去千百十"
+              {/* 数字排除选择区 */}
+              <Card className="mb-3">
+                <CardContent className="pt-0 pb-0 px-1 sm:px-4">
+                  {/* 去连号类别 */}
+                  {renderConsecutiveButtons(
+                    "four",
+                    "去四连",
+                    excludeFourSameNumbers
                   )}
-                  {renderThreeDigitSumButtons(
-                    "thousandsHundredsUnits",
-                    "去千百个"
+                  {renderConsecutiveButtons(
+                    "three",
+                    "去三连",
+                    excludeThreeConsecutiveSameNumbers
                   )}
-                  {renderThreeDigitSumButtons("thousandsTensUnits", "去千十个")}
-                  {renderThreeDigitSumButtons("hundredsTensUnits", "去百十个")}
-                </div>
-              </CardContent>
-            </Card>
+                  {renderConsecutiveButtons(
+                    "two",
+                    "去二连",
+                    excludeTwoConsecutiveSameNumbers
+                  )}
 
-            {/* 错误提示 */}
-            {errorMessage && (
-              <Alert className="mt-4 bg-red-100 border-red-400">
-                <AlertDescription className="text-red-800">
-                  {errorMessage}
-                </AlertDescription>
-              </Alert>
-            )}
+                  <Separator className="my-4" />
 
-            {/* 隐藏的文件输入 */}
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".txt"
-              onChange={handleFileChange}
-              style={{ display: "none" }}
-            />
+                  {/* 新增：任意位相同 */}
+                  {renderAnySameButtons(
+                    "anyThreeSame",
+                    "去三同",
+                    excludeAnyThreeSame
+                  )}
+                  {renderAnySameButtons(
+                    "anyTwoSame",
+                    "去两同",
+                    excludeAnyTwoSame
+                  )}
+
+                  <Separator className="my-4" />
+
+                  {/* 新增：任意位求和 */}
+                  {renderAnySumButtons(
+                    "anyThreeSum",
+                    "去三和",
+                    excludeAnyThreeSum,
+                    27
+                  )}
+                  {renderAnySumButtons(
+                    "anyTwoSum",
+                    "去两和",
+                    excludeAnyTwoSum,
+                    18
+                  )}
+
+                  <Separator className="my-4" />
+                  {renderNumberButtons("thousands", "去千")}
+                  {renderNumberButtons("hundreds", "去百")}
+                  {renderNumberButtons("tens", "去十")}
+                  {renderNumberButtons("units", "去个")}
+                  <Separator className="my-4" />
+
+                  {/* 千百、千十、千个等组合 */}
+                  <div className="space-y-6">
+                    {renderCombinationButtons("thousandsHundreds", "去千百")}
+                    {renderCombinationButtons("thousandsTens", "去千十")}
+                    {renderCombinationButtons("thousandsUnits", "去千个")}
+                    {renderCombinationButtons("hundredsTens", "去百十")}
+                    {renderCombinationButtons("hundredsUnits", "去百个")}
+                    {renderCombinationButtons("tensUnits", "去十个")}
+                  </div>
+
+                  <Separator className="my-4" />
+
+                  {/* 三位数之和组合 */}
+                  <div className="space-y-6">
+                    {renderThreeDigitSumButtons(
+                      "thousandsHundredsTens",
+                      "去千百十"
+                    )}
+                    {renderThreeDigitSumButtons(
+                      "thousandsHundredsUnits",
+                      "去千百个"
+                    )}
+                    {renderThreeDigitSumButtons(
+                      "thousandsTensUnits",
+                      "去千十个"
+                    )}
+                    {renderThreeDigitSumButtons(
+                      "hundredsTensUnits",
+                      "去百十个"
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* 错误提示 */}
+              {errorMessage && (
+                <Alert className="mt-4 bg-red-100 border-red-400">
+                  <AlertDescription className="text-red-800">
+                    {errorMessage}
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              {/* 隐藏的文件输入 */}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".txt"
+                onChange={handleFileChange}
+                style={{ display: "none" }}
+              />
+            </div>
           </div>
-        </div>
 
-        {/* 固定在底部的功能按钮 */}
-        <div className="fixed bottom-0 left-0 right-0 bg-white shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)] z-50 py-4">
-          <div className="max-w-6xl mx-auto px-4">
-            <div className="flex flex-col sm:flex-row gap-2 sm:gap-4 justify-center">
-              <Button
-                onClick={handleFileImport}
-                className={`px-4 sm:px-8 py-3 text-base sm:text-lg transition-colors ${
-                  importSuccess
-                    ? "bg-green-500 hover:bg-green-600 text-white"
-                    : "bg-red-500 hover:bg-red-600 text-white"
-                }`}
-              >
-                {importSuccess ? `已导入${importedCount}组` : "导入txt数据"}
-              </Button>
+          {/* 固定在底部的功能按钮 */}
+          <div className="fixed bottom-0 left-0 right-0 bg-white shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)] z-50 py-4">
+            <div className="max-w-6xl mx-auto px-4">
+              <div className="flex flex-col sm:flex-row gap-2 sm:gap-4 justify-center">
+                <Button
+                  onClick={handleFileImport}
+                  className={`px-4 sm:px-8 py-3 text-base sm:text-lg transition-colors ${
+                    importSuccess
+                      ? "bg-green-500 hover:bg-green-600 text-white"
+                      : "bg-red-500 hover:bg-red-600 text-white"
+                  }`}
+                >
+                  {importSuccess ? `已导入${importedCount}组` : "导入txt数据"}
+                </Button>
 
-              <Button
-                onClick={generateAndPreview}
-                disabled={!inputData.trim()}
-                className="bg-red-500 hover:bg-red-600 text-white px-4 sm:px-8 py-3 text-base sm:text-lg disabled:bg-gray-400"
-              >
-                预览筛选{inputData.trim() && ` (${calculateFilteredCount()}组)`}
-              </Button>
+                <Button
+                  onClick={generateAndPreview}
+                  disabled={!inputData.trim()}
+                  className="bg-red-500 hover:bg-red-600 text-white px-4 sm:px-8 py-3 text-base sm:text-lg disabled:bg-gray-400"
+                >
+                  预览筛选
+                  {inputData.trim() && ` (${calculateFilteredCount()}组)`}
+                </Button>
 
-              <Dialog open={showPreview} onOpenChange={setShowPreview}>
-                <DialogContent className="max-w-2xl max-h-96 gap-0 overflow-hidden">
-                  <DialogTitle className="text-lg font-semibold">
-                    数据预览
-                  </DialogTitle>
-                  {/* 顶部区域：标题信息和操作按钮在同一水平线 */}
-                  <div className="sticky top-0 z-10 bg-white border-b border-gray-200 pb-3 mb-4">
-                    <div className="flex justify-between items-center">
-                      <div>
-                        <p className="text-sm text-gray-600">
-                          共筛选出 {processedData.length} 组数据
-                        </p>
-                      </div>
-                      <div className="flex gap-2">
-                        <Button
-                          onClick={() => setShowPreview(false)}
-                          variant="outline"
-                        >
-                          取消
-                        </Button>
-                        <Button
-                          onClick={copyData}
-                          className="bg-green-500 hover:bg-green-600"
-                        >
-                          复制
-                        </Button>
-                        <Button
-                          onClick={exportData}
-                          className="bg-green-500 hover:bg-green-600"
-                        >
-                          导出
-                        </Button>
+                <Dialog open={showPreview} onOpenChange={setShowPreview}>
+                  <DialogContent className="max-w-2xl max-h-96 gap-0 overflow-hidden">
+                    <DialogTitle className="text-lg font-semibold">
+                      数据预览
+                    </DialogTitle>
+                    {/* 顶部区域：标题信息和操作按钮在同一水平线 */}
+                    <div className="sticky top-0 z-10 bg-white border-b border-gray-200 pb-3 mb-4">
+                      <div className="flex justify-between items-center">
+                        <div>
+                          <p className="text-sm text-gray-600">
+                            共筛选出 {processedData.length} 组数据
+                          </p>
+                        </div>
+                        <div className="flex gap-2">
+                          <Button
+                            onClick={() => setShowPreview(false)}
+                            variant="outline"
+                          >
+                            取消
+                          </Button>
+                          <Button
+                            onClick={copyData}
+                            className="bg-green-500 hover:bg-green-600"
+                          >
+                            复制
+                          </Button>
+                          <Button
+                            onClick={exportData}
+                            className="bg-green-500 hover:bg-green-600"
+                          >
+                            导出
+                          </Button>
+                        </div>
                       </div>
                     </div>
-                  </div>
 
-                  {/* 可滚动的数据内容 */}
-                  <div className="bg-gray-100 p-4 rounded-md max-h-60 overflow-y-auto">
-                    <pre className="whitespace-pre-wrap text-sm">
-                      {processedData.join(" ")}
-                    </pre>
-                  </div>
-                </DialogContent>
-              </Dialog>
-              <Button
-                onClick={resetAll}
-                className={`px-4 sm:px-8 py-3 text-base sm:text-lg transition-colors ${
-                  resetSuccess
-                    ? "bg-green-500 hover:bg-green-600 text-white"
-                    : "bg-orange-500 hover:bg-orange-600 text-white"
-                }`}
-              >
-                {resetSuccess ? "重置成功" : "重置"}
-              </Button>
+                    {/* 可滚动的数据内容 */}
+                    <div className="bg-gray-100 p-4 rounded-md max-h-60 overflow-y-auto">
+                      <pre className="whitespace-pre-wrap text-sm">
+                        {processedData.join(" ")}
+                      </pre>
+                    </div>
+                  </DialogContent>
+                </Dialog>
+                <Button
+                  onClick={resetAll}
+                  className={`px-4 sm:px-8 py-3 text-base sm:text-lg transition-colors ${
+                    resetSuccess
+                      ? "bg-green-500 hover:bg-green-600 text-white"
+                      : "bg-orange-500 hover:bg-orange-600 text-white"
+                  }`}
+                >
+                  {resetSuccess ? "重置成功" : "重置"}
+                </Button>
+              </div>
             </div>
           </div>
         </div>
-      </div>
-    </TooltipProvider>
+      </TooltipProvider>
+    </>
   );
 }
+
+// 全局样式组件，为移动端触感反馈优化
+const GlobalMobileStyles = () => (
+  <style jsx global>{`
+    /* 移动端按钮触感反馈优化 */
+    button {
+      -webkit-tap-highlight-color: rgba(59, 130, 246, 0.2);
+      touch-action: manipulation;
+      transform-origin: center;
+      transition: all 0.15s ease;
+    }
+
+    /* 按下时的缩放效果 */
+    button:active {
+      transform: scale(0.95);
+    }
+
+    /* 移动端禁用双击缩放 */
+    @media (max-width: 768px) {
+      * {
+        touch-action: manipulation;
+      }
+    }
+
+    /* 移动端按钮高亮颜色 */
+    .btn-primary {
+      -webkit-tap-highlight-color: rgba(239, 68, 68, 0.2);
+    }
+
+    .btn-secondary {
+      -webkit-tap-highlight-color: rgba(251, 146, 60, 0.2);
+    }
+  `}</style>
+);
+
+// 自定义Hook：为组件添加触感反馈
+export const useMobileOptimization = () => {
+  React.useEffect(() => {
+    // 为所有按钮添加触感反馈
+    const addHapticToButtons = () => {
+      const buttons = document.querySelectorAll("button");
+      buttons.forEach((button) => {
+        // 添加触摸开始事件
+        button.addEventListener(
+          "touchstart",
+          () => {
+            triggerHapticFeedback("light");
+          },
+          { passive: true }
+        );
+
+        // 添加点击事件的触感反馈
+        const originalClick = button.onclick;
+        button.onclick = (e) => {
+          triggerHapticFeedback("medium");
+          if (originalClick) {
+            originalClick.call(button, e);
+          }
+        };
+      });
+    };
+
+    // 延迟执行以确保组件已渲染
+    setTimeout(addHapticToButtons, 100);
+
+    // 监听DOM变化，为动态添加的按钮也添加触感反馈
+    const observer = new MutationObserver(addHapticToButtons);
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true,
+    });
+
+    return () => {
+      observer.disconnect();
+    };
+  }, []);
+};

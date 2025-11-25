@@ -552,7 +552,9 @@ export default function LotteryApp() {
       return true;
     });
 
-    return filtered.length;
+    // 去重
+    const uniqueFiltered = Array.from(new Set(filtered));
+    return uniqueFiltered.length;
   };
 
   // 生成并预览数据
@@ -668,7 +670,9 @@ export default function LotteryApp() {
       return true;
     });
 
-    setProcessedData(filtered);
+    // 去重
+    const uniqueFiltered = Array.from(new Set(filtered));
+    setProcessedData(uniqueFiltered);
     setErrorMessage("");
     // 直接显示预览窗口
     setShowPreview(true);

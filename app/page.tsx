@@ -167,43 +167,60 @@ export default function LotteryApp() {
     fileInputRef.current?.click();
   };
 
-  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      if (file.type === "text/plain" || file.name.endsWith(".txt")) {
-        const reader = new FileReader();
-        reader.onload = (e) => {
-          const content = e.target?.result as string;
-          setInputData(content);
-          setErrorMessage("");
+  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (files && files.length > 0) {
+      const fileList = Array.from(files);
+      const validFiles = fileList.filter(
+        (file) => file.type === "text/plain" || file.name.endsWith(".txt")
+      );
 
-          // 计算导入的四位数字组数
-          const numbers = content
-            .trim()
-            .split(/\s+/)
-            .filter((num) => /^\d{4}$/.test(num));
-
-          setImportedCount(numbers.length);
-          setImportSuccess(true);
-          // 确保输入框保持展开状态
-          setIsDataExpanded(true);
-
-          // 显示浮动成功提示
-          showSuccessMessage("导入成功！");
-
-          // 清空文件输入值，允许重复选择同一文件
-          if (fileInputRef.current) {
-            fileInputRef.current.value = "";
-          }
-        };
-        reader.readAsText(file);
-      } else {
+      if (validFiles.length === 0) {
         setErrorMessage("请选择txt格式的文件");
         setTimeout(() => setErrorMessage(""), 3000);
-        // 清空文件输入值
         if (fileInputRef.current) {
           fileInputRef.current.value = "";
         }
+        return;
+      }
+
+      try {
+        const fileContents = await Promise.all(
+          validFiles.map((file) => {
+            return new Promise<string>((resolve, reject) => {
+              const reader = new FileReader();
+              reader.onload = (e) => resolve(e.target?.result as string);
+              reader.onerror = (e) => reject(e);
+              reader.readAsText(file);
+            });
+          })
+        );
+
+        const combinedContent = fileContents.join("\n");
+        setInputData(combinedContent);
+        setErrorMessage("");
+
+        // 计算导入的四位数字组数
+        const numbers = combinedContent
+          .trim()
+          .split(/\s+/)
+          .filter((num) => /^\d{4}$/.test(num));
+
+        setImportedCount(numbers.length);
+        setImportSuccess(true);
+        // 确保输入框保持展开状态
+        setIsDataExpanded(true);
+
+        // 显示浮动成功提示
+        showSuccessMessage(`成功导入 ${validFiles.length} 个文件！`);
+
+        // 清空文件输入值，允许重复选择同一文件
+        if (fileInputRef.current) {
+          fileInputRef.current.value = "";
+        }
+      } catch (error) {
+        console.error("读取文件失败:", error);
+        setErrorMessage("读取文件失败，请重试");
       }
     }
   };
@@ -1295,6 +1312,7 @@ export default function LotteryApp() {
                 ref={fileInputRef}
                 type="file"
                 accept=".txt"
+                multiple
                 onChange={handleFileChange}
                 style={{ display: "none" }}
               />

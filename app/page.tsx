@@ -14,27 +14,7 @@ import { Separator } from "@/components/ui/separator";
 import {
   TooltipProvider,
 } from "@/components/ui/tooltip";
-
-// 触感反馈函数
-const triggerHapticFeedback = (
-  type: "light" | "medium" | "heavy" = "light"
-) => {
-  // 检查是否支持触感反馈
-  if ("vibrate" in navigator) {
-    // 根据类型设置不同的震动强度
-    switch (type) {
-      case "light":
-        navigator.vibrate(10); // 轻微震动10ms
-        break;
-      case "medium":
-        navigator.vibrate(25); // 中等震动25ms
-        break;
-      case "heavy":
-        navigator.vibrate(50); // 较强震动50ms
-        break;
-    }
-  }
-};
+import useMobileOptimization, { triggerHapticFeedback } from "@/app/hooks/useMobileOptimization";
 
 // 自定义移动端友好的Tooltip组件
 const MobileTooltip: React.FC<{
@@ -1708,46 +1688,3 @@ const GlobalMobileStyles = () => (
     }
   `}</style>
 );
-
-// 自定义Hook：为组件添加触感反馈
-export const useMobileOptimization = () => {
-  React.useEffect(() => {
-    // 为所有按钮添加触感反馈
-    const addHapticToButtons = () => {
-      const buttons = document.querySelectorAll("button");
-      buttons.forEach((button) => {
-        // 添加触摸开始事件
-        button.addEventListener(
-          "touchstart",
-          () => {
-            triggerHapticFeedback("light");
-          },
-          { passive: true }
-        );
-
-        // 添加点击事件的触感反馈
-        const originalClick = button.onclick;
-        button.onclick = (e) => {
-          triggerHapticFeedback("medium");
-          if (originalClick) {
-            originalClick.call(button, e);
-          }
-        };
-      });
-    };
-
-    // 延迟执行以确保组件已渲染
-    setTimeout(addHapticToButtons, 100);
-
-    // 监听DOM变化，为动态添加的按钮也添加触感反馈
-    const observer = new MutationObserver(addHapticToButtons);
-    observer.observe(document.body, {
-      childList: true,
-      subtree: true,
-    });
-
-    return () => {
-      observer.disconnect();
-    };
-  }, []);
-};

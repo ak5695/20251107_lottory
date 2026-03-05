@@ -145,6 +145,25 @@ export default function LotteryApp() {
   const [excludeAnyThreeSum, setExcludeAnyThreeSum] = useState<Set<number>>(
     new Set()
   );
+  // 新增：邻号对排除。index 0=>01, 1=>12, ..., 8=>89, 9=>90
+  const [excludeAdjacentPairs, setExcludeAdjacentPairs] = useState<Set<number>>(
+    new Set()
+  );
+  // 新增：不定位两码。分为‘必含’和‘杀号’。
+  const [keepTwoCodes, setKeepTwoCodes] = useState<Set<string>>(new Set());
+  const [killTwoCodes, setKillTwoCodes] = useState<Set<string>>(new Set());
+  // 筛选模式状态：'exclude' 为去除（默认），'keep' 为留下
+  const [filterModes, setFilterModes] = useState<Record<string, "exclude" | "keep">>({});
+
+  // 切换筛选模式
+  const toggleFilterMode = (key: string) => {
+    setFilterModes((prev) => ({
+      ...prev,
+      [key]: prev[key] === "keep" ? "exclude" : "keep",
+    }));
+    triggerHapticFeedback("medium");
+  };
+
   const [showPreview, setShowPreview] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [isDataExpanded, setIsDataExpanded] = useState(true);
@@ -198,23 +217,53 @@ export default function LotteryApp() {
           })
         );
 
-        const combinedContent = fileContents.join("\n");
+        // 解析每个文件的号码
+        const fileNumbers = fileContents.map((content) => {
+          return content
+            .trim()
+            .split(/\s+/)
+            .filter((num) => /^\d{4}$/.test(num));
+        });
+
+        let finalNumbers: string[] = [];
+
+        if (fileNumbers.length === 1) {
+          // 单个文件，直接使用
+          finalNumbers = fileNumbers[0];
+        } else if (fileNumbers.length > 1) {
+          // 多个文件，取交集（只保留在所有文件中都出现的号码）
+          // 先对每个文件的号码列表去重，方便计算交集
+          const fileSets = fileNumbers.map((nums) => new Set(nums));
+
+          // 从第一个文件的集合开始
+          const intersection = new Set<string>();
+
+          // 遍历第一个文件的每一个唯一号码
+          for (const num of fileSets[0]) {
+            // 检查这个号码是否在所有其它文件的集合中都存在
+            if (fileSets.every(set => set.has(num))) {
+              intersection.add(num);
+            }
+          }
+
+          finalNumbers = Array.from(intersection);
+        }
+
+        const combinedContent = finalNumbers.join(" ");
         setInputData(combinedContent);
         setErrorMessage("");
 
-        // 计算导入的四位数字组数
-        const numbers = combinedContent
-          .trim()
-          .split(/\s+/)
-          .filter((num) => /^\d{4}$/.test(num));
-
-        setImportedCount(numbers.length);
+        setImportedCount(finalNumbers.length);
         setImportSuccess(true);
         // 确保输入框保持展开状态
         setIsDataExpanded(true);
 
-        // 显示浮动成功提示
-        showSuccessMessage(`成功导入 ${validFiles.length} 个文件！`);
+        // 根据文件数量显示不同的成功提示
+        if (validFiles.length > 1) {
+          showSuccessMessage(`成功导入 ${validFiles.length} 个文件并提取交集！`);
+        } else {
+          showSuccessMessage(`成功导入 ${validFiles.length} 个文件！`);
+        }
 
         // 清空文件输入值，允许重复选择同一文件
         if (fileInputRef.current) {
@@ -271,6 +320,10 @@ export default function LotteryApp() {
     setExcludeAnyThreeSame(new Set());
     setExcludeAnyTwoSum(new Set());
     setExcludeAnyThreeSum(new Set());
+    setExcludeAdjacentPairs(new Set());
+    setKeepTwoCodes(new Set());
+    setKillTwoCodes(new Set());
+    setFilterModes({});
     setErrorMessage("");
     setImportSuccess(false);
     setImportedCount(0);
@@ -339,6 +392,8 @@ export default function LotteryApp() {
       "排除连续三个位置相同数字的组合，如选择'2'则排除2220、2221、...、0222、1222等",
     去二连:
       "排除连续两个位置相同数字的组合，如选择'3'则排除3310、3311、...、0339、1233等",
+    去邻号:
+      "排除任意位置包含指定邻号数字的组合。如选择'12'则排除包含1和2的组合（含隔位或相连），例如1002、1200、2001、2100等。",
 
     // 任意位相同
     去两同:
@@ -351,6 +406,8 @@ export default function LotteryApp() {
       "排除任意两个位置数字相加等于指定值的组合，如选择'9'则排除1284(1+8=9)、2736(2+7=9)等",
     去三和:
       "排除任意三个位置数字相加等于指定值的组合，如选择'15'则排除1689(1+6+8=15)、2589(2+5+8=15)等",
+    不定位两码:
+      "只要选中的两个数字在组合中同时出现，即判定为匹配。例如选中'34'，则所有包含3和4的组合（如1345, 3489, 4032等）都将被匹配。对于'33'此类翻倍号，则要求数字3在组合中至少出现两次。",
 
     // 单个位置
     去千: "排除千位数字为指定值的组合，如选择'1'则排除1000-1999范围的所有组合",
@@ -460,6 +517,233 @@ export default function LotteryApp() {
     return false;
   };
 
+  // 邻号对定义：index 0=>01, 1=>12, ..., 8=>89, 9=>90
+  const ADJACENT_PAIRS: [number, number][] = [
+    [0, 1], [1, 2], [2, 3], [3, 4], [4, 5],
+    [5, 6], [6, 7], [7, 8], [8, 9], [9, 0],
+  ];
+
+  // 检查四位数是否在任意位置包含指定的两个邻号数字（哪怕隔开也可以）
+  const hasAdjacentPair = (digits: number[], pairIndex: number): boolean => {
+    const [a, b] = ADJACENT_PAIRS[pairIndex];
+    const hasA = digits.includes(a);
+    const hasB = digits.includes(b);
+    return hasA && hasB;
+  };
+
+  // 检查四位数是否包含特定的两码（不定位）
+  const hasUnfixedTwoCode = (digits: number[], pairStr: string): boolean => {
+    const a = parseInt(pairStr[0]);
+    const b = parseInt(pairStr[1]);
+
+    if (a === b) {
+      // 豹子号/对子号逻辑：在该数字中 A 必须至少出现两次
+      return digits.filter((d) => d === a).length >= 2;
+    } else {
+      // 普通两码：A 和 B 都要出现
+      return digits.includes(a) && digits.includes(b);
+    }
+  };
+
+  // 核心筛选逻辑：判断一个号码是否应该保留
+  const shouldKeepNumber = (num: string): boolean => {
+    const digits = num.split("").map(Number);
+    const [thousands, hundreds, tens, units] = digits;
+
+    // 辅助函数：根据模式判断规则
+    const checkRule = (
+      key: string,
+      set: Set<number> | Set<string>,
+      isMatch: boolean
+    ): boolean => {
+      if (set.size === 0) return true;
+      const mode = filterModes[key] || "exclude";
+      return mode === "exclude" ? !isMatch : isMatch;
+    };
+
+    // 1. 去/留 连号
+    const hasFourMatch = Array.from(excludeFourSameNumbers).some((d) =>
+      hasConsecutiveSameDigit(digits, d, 4)
+    );
+    if (!checkRule("four", excludeFourSameNumbers, hasFourMatch)) return false;
+
+    const hasThreeMatch = Array.from(excludeThreeConsecutiveSameNumbers).some(
+      (d) => hasConsecutiveSameDigit(digits, d, 3)
+    );
+    if (!checkRule("three", excludeThreeConsecutiveSameNumbers, hasThreeMatch))
+      return false;
+
+    const hasTwoMatch = Array.from(excludeTwoConsecutiveSameNumbers).some((d) =>
+      hasConsecutiveSameDigit(digits, d, 2)
+    );
+    if (!checkRule("two", excludeTwoConsecutiveSameNumbers, hasTwoMatch))
+      return false;
+
+    // 1b. 去/留 邻号
+    if (excludeAdjacentPairs.size > 0) {
+      const hasAdjMatch = Array.from(excludeAdjacentPairs).some((pairIdx) =>
+        hasAdjacentPair(digits, pairIdx)
+      );
+      if (!checkRule("adjacentPairs", excludeAdjacentPairs, hasAdjMatch))
+        return false;
+    }
+
+    // 1c. 不定位两码
+    // 逻辑：号码必须包含选中的‘必含’两码中的【至少一个】 (OR 逻辑)
+    if (keepTwoCodes.size > 0) {
+      const anyKeepMatch = Array.from(keepTwoCodes).some((pairStr) =>
+        hasUnfixedTwoCode(digits, pairStr)
+      );
+      if (!anyKeepMatch) return false;
+    }
+
+    // 逻辑：号码不能包含任何选中的‘杀号’两码 (OR 逻辑)
+    if (killTwoCodes.size > 0) {
+      const anyKillMatch = Array.from(killTwoCodes).some((pairStr) =>
+        hasUnfixedTwoCode(digits, pairStr)
+      );
+      if (anyKillMatch) return false;
+    }
+
+    // 2. 去/留 任意位相同
+    const hasAnyThreeSameMatch = Array.from(excludeAnyThreeSame).some((d) =>
+      hasAnyThreeSame(digits, d)
+    );
+    if (!checkRule("anyThreeSame", excludeAnyThreeSame, hasAnyThreeSameMatch))
+      return false;
+
+    const hasAnyTwoSameMatch = Array.from(excludeAnyTwoSame).some((d) =>
+      hasAnyTwoSame(digits, d)
+    );
+    if (!checkRule("anyTwoSame", excludeAnyTwoSame, hasAnyTwoSameMatch))
+      return false;
+
+    // 3. 去/留 任意位求和
+    const hasAnyThreeSumMatch = Array.from(excludeAnyThreeSum).some((s) =>
+      hasAnyThreeSum(digits, s)
+    );
+    if (!checkRule("anyThreeSum", excludeAnyThreeSum, hasAnyThreeSumMatch))
+      return false;
+
+    const hasAnyTwoSumMatch = Array.from(excludeAnyTwoSum).some((s) =>
+      hasAnyTwoSum(digits, s)
+    );
+    if (!checkRule("anyTwoSum", excludeAnyTwoSum, hasAnyTwoSumMatch))
+      return false;
+
+    // 4. 去/留 单个位置
+    if (
+      !checkRule(
+        "thousands",
+        excludedNumbers.thousands,
+        excludedNumbers.thousands.has(thousands)
+      )
+    )
+      return false;
+    if (
+      !checkRule(
+        "hundreds",
+        excludedNumbers.hundreds,
+        excludedNumbers.hundreds.has(hundreds)
+      )
+    )
+      return false;
+    if (
+      !checkRule("tens", excludedNumbers.tens, excludedNumbers.tens.has(tens))
+    )
+      return false;
+    if (
+      !checkRule("units", excludedNumbers.units, excludedNumbers.units.has(units))
+    )
+      return false;
+
+    // 5. 去/留 组合位置（两位）
+    if (
+      !checkRule(
+        "thousandsHundreds",
+        excludedNumbers.thousandsHundreds,
+        excludedNumbers.thousandsHundreds.has(thousands + hundreds)
+      )
+    )
+      return false;
+    if (
+      !checkRule(
+        "thousandsTens",
+        excludedNumbers.thousandsTens,
+        excludedNumbers.thousandsTens.has(thousands + tens)
+      )
+    )
+      return false;
+    if (
+      !checkRule(
+        "thousandsUnits",
+        excludedNumbers.thousandsUnits,
+        excludedNumbers.thousandsUnits.has(thousands + units)
+      )
+    )
+      return false;
+    if (
+      !checkRule(
+        "hundredsTens",
+        excludedNumbers.hundredsTens,
+        excludedNumbers.hundredsTens.has(hundreds + tens)
+      )
+    )
+      return false;
+    if (
+      !checkRule(
+        "hundredsUnits",
+        excludedNumbers.hundredsUnits,
+        excludedNumbers.hundredsUnits.has(hundreds + units)
+      )
+    )
+      return false;
+    if (
+      !checkRule(
+        "tensUnits",
+        excludedNumbers.tensUnits,
+        excludedNumbers.tensUnits.has(tens + units)
+      )
+    )
+      return false;
+
+    // 6. 去/留 组合位置（三位）
+    if (
+      !checkRule(
+        "thousandsHundredsTens",
+        excludedNumbers.thousandsHundredsTens,
+        excludedNumbers.thousandsHundredsTens.has(thousands + hundreds + tens)
+      )
+    )
+      return false;
+    if (
+      !checkRule(
+        "thousandsHundredsUnits",
+        excludedNumbers.thousandsHundredsUnits,
+        excludedNumbers.thousandsHundredsUnits.has(thousands + hundreds + units)
+      )
+    )
+      return false;
+    if (
+      !checkRule(
+        "thousandsTensUnits",
+        excludedNumbers.thousandsTensUnits,
+        excludedNumbers.thousandsTensUnits.has(thousands + tens + units)
+      )
+    )
+      return false;
+    if (
+      !checkRule(
+        "hundredsTensUnits",
+        excludedNumbers.hundredsTensUnits,
+        excludedNumbers.hundredsTensUnits.has(hundreds + tens + units)
+      )
+    )
+      return false;
+
+    return true;
+  };
+
   // 实时计算筛选后的组数
   const calculateFilteredCount = () => {
     if (!inputData.trim()) return 0;
@@ -471,105 +755,7 @@ export default function LotteryApp() {
 
     if (numbers.length === 0) return 0;
 
-    const filtered = numbers.filter((num) => {
-      const digits = num.split("").map(Number);
-      const [thousands, hundreds, tens, units] = digits;
-
-      // 去四连号：检查是否包含指定数字的四连号
-      for (const digit of excludeFourSameNumbers) {
-        if (hasConsecutiveSameDigit(digits, digit, 4)) {
-          return false;
-        }
-      }
-
-      // 去三连号：检查是否包含指定数字的三连号
-      for (const digit of excludeThreeConsecutiveSameNumbers) {
-        if (hasConsecutiveSameDigit(digits, digit, 3)) {
-          return false;
-        }
-      }
-
-      // 去二连号：检查是否包含指定数字的二连号
-      for (const digit of excludeTwoConsecutiveSameNumbers) {
-        if (hasConsecutiveSameDigit(digits, digit, 2)) {
-          return false;
-        }
-      }
-
-      // 检查单个位置的排除
-      if (
-        excludedNumbers.thousands.has(thousands) ||
-        excludedNumbers.hundreds.has(hundreds) ||
-        excludedNumbers.tens.has(tens) ||
-        excludedNumbers.units.has(units)
-      ) {
-        return false;
-      }
-
-      // 检查组合位置的排除（两位数字之和）
-      const thousandsHundreds = thousands + hundreds;
-      const thousandsTens = thousands + tens;
-      const thousandsUnits = thousands + units;
-      const hundredsTens = hundreds + tens;
-      const hundredsUnits = hundreds + units;
-      const tensUnits = tens + units;
-
-      if (
-        excludedNumbers.thousandsHundreds.has(thousandsHundreds) ||
-        excludedNumbers.thousandsTens.has(thousandsTens) ||
-        excludedNumbers.thousandsUnits.has(thousandsUnits) ||
-        excludedNumbers.hundredsTens.has(hundredsTens) ||
-        excludedNumbers.hundredsUnits.has(hundredsUnits) ||
-        excludedNumbers.tensUnits.has(tensUnits)
-      ) {
-        return false;
-      }
-
-      // 检查组合位置的排除（三位数字之和）
-      const thousandsHundredsTens = thousands + hundreds + tens;
-      const thousandsHundredsUnits = thousands + hundreds + units;
-      const thousandsTensUnits = thousands + tens + units;
-      const hundredsTensUnits = hundreds + tens + units;
-
-      if (
-        excludedNumbers.thousandsHundredsTens.has(thousandsHundredsTens) ||
-        excludedNumbers.thousandsHundredsUnits.has(thousandsHundredsUnits) ||
-        excludedNumbers.thousandsTensUnits.has(thousandsTensUnits) ||
-        excludedNumbers.hundredsTensUnits.has(hundredsTensUnits)
-      ) {
-        return false;
-      }
-
-      // 去任意两位相同：检查是否包含指定数字的任意两位相同
-      for (const digit of excludeAnyTwoSame) {
-        if (hasAnyTwoSame(digits, digit)) {
-          return false;
-        }
-      }
-
-      // 去任意三位相同：检查是否包含指定数字的任意三位相同
-      for (const digit of excludeAnyThreeSame) {
-        if (hasAnyThreeSame(digits, digit)) {
-          return false;
-        }
-      }
-
-      // 去任意两位求和：检查是否包含指定求和值的任意两位
-      for (const sum of excludeAnyTwoSum) {
-        if (hasAnyTwoSum(digits, sum)) {
-          return false;
-        }
-      }
-
-      // 去任意三位求和：检查是否包含指定求和值的任意三位
-      for (const sum of excludeAnyThreeSum) {
-        if (hasAnyThreeSum(digits, sum)) {
-          return false;
-        }
-      }
-
-      return true;
-    });
+    const filtered = numbers.filter(shouldKeepNumber);
 
     // 去重
     const uniqueFiltered = Array.from(new Set(filtered));
@@ -589,105 +775,7 @@ export default function LotteryApp() {
       return;
     }
 
-    const filtered = numbers.filter((num) => {
-      const digits = num.split("").map(Number);
-      const [thousands, hundreds, tens, units] = digits;
-
-      // 去四连号：检查是否包含指定数字的四连号
-      for (const digit of excludeFourSameNumbers) {
-        if (hasConsecutiveSameDigit(digits, digit, 4)) {
-          return false;
-        }
-      }
-
-      // 去三连号：检查是否包含指定数字的三连号
-      for (const digit of excludeThreeConsecutiveSameNumbers) {
-        if (hasConsecutiveSameDigit(digits, digit, 3)) {
-          return false;
-        }
-      }
-
-      // 去二连号：检查是否包含指定数字的二连号
-      for (const digit of excludeTwoConsecutiveSameNumbers) {
-        if (hasConsecutiveSameDigit(digits, digit, 2)) {
-          return false;
-        }
-      }
-
-      // 检查单个位置的排除
-      if (
-        excludedNumbers.thousands.has(thousands) ||
-        excludedNumbers.hundreds.has(hundreds) ||
-        excludedNumbers.tens.has(tens) ||
-        excludedNumbers.units.has(units)
-      ) {
-        return false;
-      }
-
-      // 检查组合位置的排除（两位数字之和）
-      const thousandsHundreds = thousands + hundreds;
-      const thousandsTens = thousands + tens;
-      const thousandsUnits = thousands + units;
-      const hundredsTens = hundreds + tens;
-      const hundredsUnits = hundreds + units;
-      const tensUnits = tens + units;
-
-      if (
-        excludedNumbers.thousandsHundreds.has(thousandsHundreds) ||
-        excludedNumbers.thousandsTens.has(thousandsTens) ||
-        excludedNumbers.thousandsUnits.has(thousandsUnits) ||
-        excludedNumbers.hundredsTens.has(hundredsTens) ||
-        excludedNumbers.hundredsUnits.has(hundredsUnits) ||
-        excludedNumbers.tensUnits.has(tensUnits)
-      ) {
-        return false;
-      }
-
-      // 检查组合位置的排除（三位数字之和）
-      const thousandsHundredsTens = thousands + hundreds + tens;
-      const thousandsHundredsUnits = thousands + hundreds + units;
-      const thousandsTensUnits = thousands + tens + units;
-      const hundredsTensUnits = hundreds + tens + units;
-
-      if (
-        excludedNumbers.thousandsHundredsTens.has(thousandsHundredsTens) ||
-        excludedNumbers.thousandsHundredsUnits.has(thousandsHundredsUnits) ||
-        excludedNumbers.thousandsTensUnits.has(thousandsTensUnits) ||
-        excludedNumbers.hundredsTensUnits.has(hundredsTensUnits)
-      ) {
-        return false;
-      }
-
-      // 去任意两位相同：检查是否包含指定数字的任意两位相同
-      for (const digit of excludeAnyTwoSame) {
-        if (hasAnyTwoSame(digits, digit)) {
-          return false;
-        }
-      }
-
-      // 去任意三位相同：检查是否包含指定数字的任意三位相同
-      for (const digit of excludeAnyThreeSame) {
-        if (hasAnyThreeSame(digits, digit)) {
-          return false;
-        }
-      }
-
-      // 去任意两位求和：检查是否包含指定求和值的任意两位
-      for (const sum of excludeAnyTwoSum) {
-        if (hasAnyTwoSum(digits, sum)) {
-          return false;
-        }
-      }
-
-      // 去任意三位求和：检查是否包含指定求和值的任意三位
-      for (const sum of excludeAnyThreeSum) {
-        if (hasAnyThreeSum(digits, sum)) {
-          return false;
-        }
-      }
-
-      return true;
-    });
+    const filtered = numbers.filter(shouldKeepNumber);
 
     // 去重
     const uniqueFiltered = Array.from(new Set(filtered));
@@ -697,18 +785,43 @@ export default function LotteryApp() {
     setShowPreview(true);
   };
 
+  // 渲染规则案卷头（包含去/留切换按钮）
+  const renderRuleHeader = (key: string, label: string) => {
+    const mode = filterModes[key] || "exclude";
+    const isKeep = mode === "keep";
+    const displayLabel = label.replace(/^(去|留)/, "");
+
+    return (
+      <div className="flex flex-col items-center mr-2 sm:mr-4 w-12 sm:w-16 shrink-0">
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => toggleFilterMode(key as string)}
+          className={`h-7 px-1 text-[10px] sm:text-xs mb-1 font-bold ${isKeep
+            ? "bg-green-500 text-white hover:bg-green-600 border-green-600 shadow-sm"
+            : "bg-red-500 text-white hover:bg-red-600 border-red-600 shadow-sm"
+            } transition-all duration-200 rounded-md active:scale-95`}
+        >
+          {isKeep ? "留下" : "去除"}
+        </Button>
+        <MobileTooltip
+          content={tooltipTexts[label as keyof typeof tooltipTexts] || ""}
+          className="font-medium text-center text-sm sm:text-lg leading-tight text-gray-700"
+        >
+          <span>{displayLabel}</span>
+        </MobileTooltip>
+      </div>
+    );
+  };
+
   const renderNumberButtons = (
     position: keyof typeof excludedNumbers,
     label: string
   ) => (
     <div className="mb-6">
       <div className="flex items-start mb-3">
-        <MobileTooltip
-          content={tooltipTexts[label as keyof typeof tooltipTexts] || ""}
-          className="font-medium leading-10 mr-2 sm:mr-4 w-12 sm:w-16 shrink-0 text-right text-sm sm:text-lg"
-        >
-          <span>{label}</span>
-        </MobileTooltip>
+        {renderRuleHeader(position, label)}
         <div className="flex flex-wrap gap-1 sm:gap-2 flex-1">
           {/* 全部按钮 */}
           <Button
@@ -717,15 +830,13 @@ export default function LotteryApp() {
               "medium"
             )}
             onTouchStart={() => triggerHapticFeedback("light")}
-            className={`w-10 h-10 sm:w-12 sm:h-12 text-xs sm:text-sm font-semibold transition-all duration-150 active:scale-95 ${
-              [0, 1, 2, 3, 4, 5, 6, 7, 8, 9].every((num) =>
-                excludedNumbers[position].has(num)
-              )
-                ? "bg-red-500 hover:bg-red-600 text-white"
-                : "bg-orange-400 hover:bg-orange-500 text-white"
-            }`}
+            className={`w-10 h-10 sm:w-12 sm:h-12 text-xs sm:text-sm font-semibold transition-all duration-150 active:scale-95 ${[0, 1, 2, 3, 4, 5, 6, 7, 8, 9].every((num) =>
+              excludedNumbers[position].has(num)
+            )
+              ? (filterModes[position] === "keep" ? "bg-green-500 hover:bg-green-600" : "bg-red-500 hover:bg-red-600") + " text-white"
+              : "bg-orange-400 hover:bg-orange-500 text-white"
+              }`}
             style={{
-              WebkitTapHighlightColor: "rgba(239, 68, 68, 0.2)",
               touchAction: "manipulation",
             }}
           >
@@ -740,13 +851,11 @@ export default function LotteryApp() {
                 "light"
               )}
               onTouchStart={() => triggerHapticFeedback("light")}
-              className={`w-10 h-10 sm:w-12 sm:h-12 text-sm sm:text-lg font-semibold transition-all duration-150 active:scale-95 ${
-                excludedNumbers[position].has(num)
-                  ? "bg-red-500 hover:bg-red-600 text-white"
-                  : "bg-orange-400 hover:bg-orange-500 text-white"
-              }`}
+              className={`w-10 h-10 sm:w-12 sm:h-12 text-sm sm:text-lg font-semibold transition-all duration-150 active:scale-95 ${excludedNumbers[position].has(num)
+                ? (filterModes[position] === "keep" ? "bg-green-500 hover:bg-green-600" : "bg-red-500 hover:bg-red-600") + " text-white"
+                : "bg-orange-400 hover:bg-orange-500 text-white"
+                }`}
               style={{
-                WebkitTapHighlightColor: "rgba(239, 68, 68, 0.2)",
                 touchAction: "manipulation",
               }}
             >
@@ -764,23 +873,17 @@ export default function LotteryApp() {
   ) => (
     <div className="mb-6">
       <div className="flex items-start mb-3">
-        <MobileTooltip
-          content={tooltipTexts[label as keyof typeof tooltipTexts] || ""}
-          className="font-medium leading-10 mr-2 sm:mr-4 w-12 sm:w-16 shrink-0 text-right text-sm sm:text-lg"
-        >
-          <span>{label}</span>
-        </MobileTooltip>
+        {renderRuleHeader(position, label)}
         <div className="flex flex-wrap gap-1 sm:gap-2 flex-1">
           {/* 全部按钮 */}
           <Button
             onClick={() => toggleAllBasic(position, 18)}
-            className={`w-8 h-8 sm:w-12 sm:h-12 text-xs sm:text-sm font-semibold transition-colors ${
-              Array.from({ length: 19 }, (_, i) => i).every((num) =>
-                excludedNumbers[position].has(num)
-              )
-                ? "bg-red-500 hover:bg-red-600 text-white"
-                : "bg-orange-400 hover:bg-orange-500 text-white"
-            }`}
+            className={`w-8 h-8 sm:w-12 sm:h-12 text-xs sm:text-sm font-semibold transition-colors ${Array.from({ length: 19 }, (_, i) => i).every((num) =>
+              excludedNumbers[position].has(num)
+            )
+              ? (filterModes[position] === "keep" ? "bg-green-500 hover:bg-green-600" : "bg-red-500 hover:bg-red-600") + " text-white"
+              : "bg-orange-400 hover:bg-orange-500 text-white"
+              }`}
           >
             全部
           </Button>
@@ -791,11 +894,10 @@ export default function LotteryApp() {
             <Button
               key={num}
               onClick={() => toggleExcluded(position, num)}
-              className={`w-8 h-8 sm:w-12 sm:h-12 text-xs sm:text-lg font-semibold transition-colors ${
-                excludedNumbers[position].has(num)
-                  ? "bg-red-500 hover:bg-red-600 text-white"
-                  : "bg-orange-400 hover:bg-orange-500 text-white"
-              }`}
+              className={`w-8 h-8 sm:w-12 sm:h-12 text-xs sm:text-lg font-semibold transition-colors ${excludedNumbers[position].has(num)
+                ? (filterModes[position] === "keep" ? "bg-green-500 hover:bg-green-600" : "bg-red-500 hover:bg-red-600") + " text-white"
+                : "bg-orange-400 hover:bg-orange-500 text-white"
+                }`}
             >
               {num}
             </Button>
@@ -811,23 +913,17 @@ export default function LotteryApp() {
   ) => (
     <div className="mb-6">
       <div className="flex items-start mb-3">
-        <MobileTooltip
-          content={tooltipTexts[label as keyof typeof tooltipTexts] || ""}
-          className="font-medium leading-10 mr-2 sm:mr-4 w-12 sm:w-16 shrink-0 text-right text-xs sm:text-base"
-        >
-          <span>{label}</span>
-        </MobileTooltip>
+        {renderRuleHeader(position, label)}
         <div className="flex flex-wrap gap-1 sm:gap-2 flex-1">
           {/* 全部按钮 */}
           <Button
             onClick={() => toggleAllBasic(position, 27)}
-            className={`w-8 h-8 sm:w-12 sm:h-12 text-xs sm:text-sm font-semibold transition-colors ${
-              Array.from({ length: 28 }, (_, i) => i).every((num) =>
-                excludedNumbers[position].has(num)
-              )
-                ? "bg-red-500 hover:bg-red-600 text-white"
-                : "bg-orange-400 hover:bg-orange-500 text-white"
-            }`}
+            className={`w-8 h-8 sm:w-12 sm:h-12 text-xs sm:text-sm font-semibold transition-colors ${Array.from({ length: 28 }, (_, i) => i).every((num) =>
+              excludedNumbers[position].has(num)
+            )
+              ? (filterModes[position] === "keep" ? "bg-green-500 hover:bg-green-600" : "bg-red-500 hover:bg-red-600") + " text-white"
+              : "bg-orange-400 hover:bg-orange-500 text-white"
+              }`}
           >
             全部
           </Button>
@@ -836,11 +932,10 @@ export default function LotteryApp() {
             <Button
               key={num}
               onClick={() => toggleExcluded(position, num)}
-              className={`w-8 h-8 sm:w-12 sm:h-12 text-xs sm:text-lg font-semibold transition-colors ${
-                excludedNumbers[position].has(num)
-                  ? "bg-red-500 hover:bg-red-600 text-white"
-                  : "bg-orange-400 hover:bg-orange-500 text-white"
-              }`}
+              className={`w-8 h-8 sm:w-12 sm:h-12 text-xs sm:text-lg font-semibold transition-colors ${excludedNumbers[position].has(num)
+                ? (filterModes[position] === "keep" ? "bg-green-500 hover:bg-green-600" : "bg-red-500 hover:bg-red-600") + " text-white"
+                : "bg-orange-400 hover:bg-orange-500 text-white"
+                }`}
             >
               {num}
             </Button>
@@ -927,6 +1022,199 @@ export default function LotteryApp() {
     }
   };
 
+  // 切换单个邻号对的状态
+  const toggleAdjacentPair = (pairIndex: number) => {
+    setExcludeAdjacentPairs((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(pairIndex)) {
+        newSet.delete(pairIndex);
+      } else {
+        newSet.add(pairIndex);
+      }
+      return newSet;
+    });
+  };
+
+  // 切换全部邻号对
+  const toggleAllAdjacentPairs = () => {
+    const allPairs = new Set([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
+    const isAllSelected = [...allPairs].every((i) => excludeAdjacentPairs.has(i));
+    setExcludeAdjacentPairs(isAllSelected ? new Set() : allPairs);
+  };
+
+  // 渲染邻号对按钮
+  const renderAdjacentButtons = () => {
+    const pairLabels = ["01", "12", "23", "34", "45", "56", "67", "78", "89", "90"];
+    return (
+      <div className="mb-6">
+        <div className="flex items-start mb-3">
+          {renderRuleHeader("adjacentPairs", "去邻号")}
+          <div className="flex flex-wrap gap-1 sm:gap-2 flex-1">
+            {/* 全部按钮 */}
+            <Button
+              onClick={withHapticFeedback(toggleAllAdjacentPairs, "medium")}
+              onTouchStart={() => triggerHapticFeedback("light")}
+              className={`h-10 px-2 sm:h-12 sm:px-3 text-xs sm:text-sm font-semibold transition-all duration-150 active:scale-95 ${[...Array(10)].every((_, i) => excludeAdjacentPairs.has(i))
+                ? (filterModes.adjacentPairs === "keep" ? "bg-green-500 hover:bg-green-600" : "bg-red-500 hover:bg-red-600") + " text-white"
+                : "bg-orange-400 hover:bg-orange-500 text-white"
+                }`}
+              style={{
+                touchAction: "manipulation",
+              }}
+            >
+              全部
+            </Button>
+            {/* 邻号对按钮 01 12 23 ... 90 */}
+            {pairLabels.map((label, index) => (
+              <Button
+                key={index}
+                onClick={withHapticFeedback(() => toggleAdjacentPair(index), "light")}
+                onTouchStart={() => triggerHapticFeedback("light")}
+                className={`h-10 px-2 sm:h-12 sm:px-3 text-xs sm:text-sm font-semibold transition-all duration-150 active:scale-95 ${excludeAdjacentPairs.has(index)
+                  ? (filterModes.adjacentPairs === "keep" ? "bg-green-500 hover:bg-green-600" : "bg-red-500 hover:bg-red-600") + " text-white"
+                  : "bg-orange-400 hover:bg-orange-500 text-white"
+                  }`}
+                style={{
+                  touchAction: "manipulation",
+                }}
+              >
+                {label}
+              </Button>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // 渲染不定位两码按钮 (00-99)
+  const renderUnfixedTwoCodeButtons = () => {
+    // 根据图片逻辑构造网格数据
+    const grid = [
+      ["00", "01", "02", "03", "04", "05", "06", "07", "08", "09", "99"],
+      ["11", "12", "13", "14", "15", "16", "17", "18", "19", "88", "89"],
+      ["22", "23", "24", "25", "26", "27", "28", "29", "77", "78", "79"],
+      ["33", "34", "35", "36", "37", "38", "39", "66", "67", "68", "69"],
+      ["44", "45", "46", "47", "48", "49", "55", "56", "57", "58", "59"],
+      ["55", "56", "57", "58", "59", "44", "45", "46", "47", "48", "49"],
+      ["66", "67", "68", "69", "33", "34", "35", "36", "37", "38", "39"],
+      ["77", "78", "79", "22", "23", "24", "25", "26", "27", "28", "29"],
+      ["88", "89", "11", "12", "13", "14", "15", "16", "17", "18", "19"],
+      ["99", "00", "01", "02", "03", "04", "05", "06", "07", "08", "09"],
+    ];
+
+    const togglePair = (pair: string, isKeepZone: boolean) => {
+      if (isKeepZone) {
+        setKeepTwoCodes((prev) => {
+          const next = new Set(prev);
+          if (next.has(pair)) next.delete(pair);
+          else next.add(pair);
+          return next;
+        });
+      } else {
+        setKillTwoCodes((prev) => {
+          const next = new Set(prev);
+          if (next.has(pair)) next.delete(pair);
+          else next.add(pair);
+          return next;
+        });
+      }
+    };
+
+    const toggleAll = () => {
+      if (keepTwoCodes.size > 0 || killTwoCodes.size > 0) {
+        setKeepTwoCodes(new Set());
+        setKillTwoCodes(new Set());
+      }
+    };
+
+    return (
+      <div className="mb-6 flex">
+        {/* 左侧标题 */}
+        <div className="flex flex-col items-center mr-2 sm:mr-4 w-12 sm:w-16 shrink-0 mt-2">
+          <div className="text-orange-500 text-sm sm:text-lg font-bold leading-tight">
+            不定位
+          </div>
+          <div className="text-orange-500 text-sm sm:text-lg font-bold leading-tight">
+            两码
+          </div>
+        </div>
+
+        <div className="flex-1 overflow-x-auto scroller-hidden">
+          {/* 顶部操作栏 */}
+          <div className="flex items-center gap-2 mb-2">
+            <span className="text-sm font-bold">
+              <span className="text-gray-700">必含</span> /
+              <span className="text-red-500 ml-1">不含(杀)</span>
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={withHapticFeedback(toggleAll, "medium")}
+              className="h-7 px-3 text-xs"
+            >
+              全选
+            </Button>
+          </div>
+
+          {/* 按钮网格 */}
+          <div className="flex flex-col gap-1 min-w-max pb-2">
+            {grid.map((row, rowIndex) => (
+              <div key={rowIndex} className="flex gap-1">
+                {row.map((pair, colIndex) => {
+                  // 根据图片规律判断是否属于红区（杀号区）
+                  // 规律：R0有一个红(col10), R1有二个(col9,10), ..., R4有五个, 
+                  // R5开始从中间劈开，红区占比变大
+                  const isRedArea = (rowIndex === 0 && colIndex >= 10) ||
+                    (rowIndex === 1 && colIndex >= 9) ||
+                    (rowIndex === 2 && colIndex >= 8) ||
+                    (rowIndex === 3 && colIndex >= 7) ||
+                    (rowIndex === 4 && colIndex >= 6) ||
+                    (rowIndex === 5 && colIndex >= 5) ||
+                    (rowIndex === 6 && colIndex >= 4) ||
+                    (rowIndex === 7 && colIndex >= 3) ||
+                    (rowIndex === 8 && colIndex >= 2) ||
+                    (rowIndex === 9 && colIndex >= 1);
+
+                  const isSelected = isRedArea
+                    ? killTwoCodes.has(pair)
+                    : keepTwoCodes.has(pair);
+
+                  return (
+                    <Button
+                      key={`${rowIndex}-${colIndex}`}
+                      onClick={withHapticFeedback(
+                        () => togglePair(pair, !isRedArea),
+                        "light"
+                      )}
+                      className={`w-8 h-8 sm:w-10 sm:h-10 p-0 text-xs sm:text-sm font-bold transition-all border-2 ${isSelected
+                        ? (isRedArea ? "bg-red-500 border-red-700 shadow-inner" : "bg-green-500 border-green-700 shadow-inner") + " text-white"
+                        : (isRedArea ? "bg-orange-400 border-red-500 hover:bg-orange-500" : "bg-orange-400 border-green-500 hover:bg-orange-500") + " text-white shadow-sm"
+                        }`}
+                    >
+                      {pair}
+                    </Button>
+                  );
+                })}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* 右侧提示文案 (移动端隐藏或另行优化) */}
+        <div className="hidden lg:block w-48 ml-4 text-[10px] text-gray-500 border-l pl-2 leading-normal self-center">
+          <div className="flex items-start gap-1">
+            <span className="p-0.5 bg-gray-100 rounded leading-none">ⓘ</span>
+            <p>
+              不定位两码：对于豹子号，只有一组两码，如999则为99；对于组三号，有两组两码，如227-22、27；对于组六号，有三组两码，如571-15、17、27。
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+
   // 渲染连号选择按钮
   const renderConsecutiveButtons = (
     type: "four" | "three" | "two",
@@ -935,21 +1223,15 @@ export default function LotteryApp() {
   ) => (
     <div className="mb-6">
       <div className="flex items-start mb-3">
-        <MobileTooltip
-          content={tooltipTexts[label as keyof typeof tooltipTexts] || ""}
-          className="font-medium leading-10 mr-2 sm:mr-4 w-12 sm:w-16 shrink-0 text-right text-sm sm:text-lg"
-        >
-          <span>{label}</span>
-        </MobileTooltip>
+        {renderRuleHeader(type, label)}
         <div className="flex flex-wrap gap-1 sm:gap-2 flex-1">
           {/* 全部按钮 */}
           <Button
             onClick={() => toggleAllConsecutive(type)}
-            className={`w-10 h-10 sm:w-12 sm:h-12 text-xs sm:text-sm font-semibold transition-colors ${
-              [...Array(10)].every((_, i) => excludedSet.has(i))
-                ? "bg-red-500 hover:bg-red-600 text-white"
-                : "bg-orange-400 hover:bg-orange-500 text-white"
-            }`}
+            className={`w-10 h-10 sm:w-12 sm:h-12 text-xs sm:text-sm font-semibold transition-colors ${[...Array(10)].every((_, i) => excludedSet.has(i))
+              ? (filterModes[type] === "keep" ? "bg-green-500 hover:bg-green-600" : "bg-red-500 hover:bg-red-600") + " text-white"
+              : "bg-orange-400 hover:bg-orange-500 text-white"
+              }`}
           >
             全部
           </Button>
@@ -958,11 +1240,10 @@ export default function LotteryApp() {
             <Button
               key={digit}
               onClick={() => toggleConsecutiveDigit(type, digit)}
-              className={`w-10 h-10 sm:w-12 sm:h-12 text-sm sm:text-lg font-semibold transition-colors ${
-                excludedSet.has(digit)
-                  ? "bg-red-500 hover:bg-red-600 text-white"
-                  : "bg-orange-400 hover:bg-orange-500 text-white"
-              }`}
+              className={`w-10 h-10 sm:w-12 sm:h-12 text-sm sm:text-lg font-semibold transition-colors ${excludedSet.has(digit)
+                ? (filterModes[type] === "keep" ? "bg-green-500 hover:bg-green-600" : "bg-red-500 hover:bg-red-600") + " text-white"
+                : "bg-orange-400 hover:bg-orange-500 text-white"
+                }`}
             >
               {digit}
             </Button>
@@ -1051,21 +1332,15 @@ export default function LotteryApp() {
   ) => (
     <div className="mb-6">
       <div className="flex items-start mb-3">
-        <MobileTooltip
-          content={tooltipTexts[label as keyof typeof tooltipTexts] || ""}
-          className="font-medium leading-10 mr-2 sm:mr-4 w-12 sm:w-16 shrink-0 text-right text-sm sm:text-lg"
-        >
-          <span>{label}</span>
-        </MobileTooltip>
+        {renderRuleHeader(type, label)}
         <div className="flex flex-wrap gap-1 sm:gap-2 flex-1">
           {/* 全部按钮 */}
           <Button
             onClick={() => toggleAllAny(type)}
-            className={`w-10 h-10 sm:w-12 sm:h-12 text-xs sm:text-sm font-semibold transition-colors ${
-              [...Array(10)].every((_, i) => excludedSet.has(i))
-                ? "bg-red-500 hover:bg-red-600 text-white"
-                : "bg-orange-400 hover:bg-orange-500 text-white"
-            }`}
+            className={`w-10 h-10 sm:w-12 sm:h-12 text-xs sm:text-sm font-semibold transition-colors ${[...Array(10)].every((_, i) => excludedSet.has(i))
+              ? (filterModes[type] === "keep" ? "bg-green-500 hover:bg-green-600" : "bg-red-500 hover:bg-red-600") + " text-white"
+              : "bg-orange-400 hover:bg-orange-500 text-white"
+              }`}
           >
             全部
           </Button>
@@ -1074,11 +1349,10 @@ export default function LotteryApp() {
             <Button
               key={digit}
               onClick={() => toggleAnyDigit(type, digit)}
-              className={`w-10 h-10 sm:w-12 sm:h-12 text-sm sm:text-lg font-semibold transition-colors ${
-                excludedSet.has(digit)
-                  ? "bg-red-500 hover:bg-red-600 text-white"
-                  : "bg-orange-400 hover:bg-orange-500 text-white"
-              }`}
+              className={`w-10 h-10 sm:w-12 sm:h-12 text-sm sm:text-lg font-semibold transition-colors ${excludedSet.has(digit)
+                ? (filterModes[type] === "keep" ? "bg-green-500 hover:bg-green-600" : "bg-red-500 hover:bg-red-600") + " text-white"
+                : "bg-orange-400 hover:bg-orange-500 text-white"
+                }`}
             >
               {digit}
             </Button>
@@ -1097,21 +1371,15 @@ export default function LotteryApp() {
   ) => (
     <div className="mb-6">
       <div className="flex items-start mb-3">
-        <MobileTooltip
-          content={tooltipTexts[label as keyof typeof tooltipTexts] || ""}
-          className="font-medium leading-10 mr-2 sm:mr-4 w-12 sm:w-16 shrink-0 text-right text-sm sm:text-lg"
-        >
-          <span>{label}</span>
-        </MobileTooltip>
+        {renderRuleHeader(type, label)}
         <div className="flex flex-wrap gap-1 sm:gap-2 flex-1">
           {/* 全部按钮 */}
           <Button
             onClick={() => toggleAllAny(type)}
-            className={`size-8 sm:size-12 text-xs sm:text-sm font-semibold transition-colors ${
-              [...Array(maxValue + 1)].every((_, i) => excludedSet.has(i))
-                ? "bg-red-500 hover:bg-red-600 text-white"
-                : "bg-orange-400 hover:bg-orange-500 text-white"
-            }`}
+            className={`size-8 sm:size-12 text-xs sm:text-sm font-semibold transition-colors ${[...Array(maxValue + 1)].every((_, i) => excludedSet.has(i))
+              ? (filterModes[type] === "keep" ? "bg-green-500 hover:bg-green-600" : "bg-red-500 hover:bg-red-600") + " text-white"
+              : "bg-orange-400 hover:bg-orange-500 text-white"
+              }`}
           >
             全部
           </Button>
@@ -1120,11 +1388,10 @@ export default function LotteryApp() {
             <Button
               key={sum}
               onClick={() => toggleAnyDigit(type, sum)}
-              className={`w-8 h-8 sm:w-12 sm:h-12 text-xs sm:text-sm font-semibold transition-colors ${
-                excludedSet.has(sum)
-                  ? "bg-red-500 hover:bg-red-600 text-white"
-                  : "bg-orange-400 hover:bg-orange-500 text-white"
-              }`}
+              className={`w-8 h-8 sm:w-12 sm:h-12 text-xs sm:text-sm font-semibold transition-colors ${excludedSet.has(sum)
+                ? (filterModes[type] === "keep" ? "bg-green-500 hover:bg-green-600" : "bg-red-500 hover:bg-red-600") + " text-white"
+                : "bg-orange-400 hover:bg-orange-500 text-white"
+                }`}
             >
               {sum}
             </Button>
@@ -1229,6 +1496,14 @@ export default function LotteryApp() {
                     excludeTwoConsecutiveSameNumbers
                   )}
 
+                  {/* 邻号规则 */}
+                  {renderAdjacentButtons()}
+
+                  <Separator className="my-4" />
+
+                  {/* 不定位两码 */}
+                  {renderUnfixedTwoCodeButtons()}
+
                   <Separator className="my-4" />
 
                   {/* 新增：任意位相同 */}
@@ -1327,11 +1602,10 @@ export default function LotteryApp() {
               <div className="flex flex-col sm:flex-row gap-2 sm:gap-4 justify-center">
                 <Button
                   onClick={handleFileImport}
-                  className={`px-4 sm:px-8 py-3 text-base sm:text-lg transition-colors ${
-                    importSuccess
-                      ? "bg-green-500 hover:bg-green-600 text-white"
-                      : "bg-red-500 hover:bg-red-600 text-white"
-                  }`}
+                  className={`px-4 sm:px-8 py-3 text-base sm:text-lg transition-colors ${importSuccess
+                    ? "bg-green-500 hover:bg-green-600 text-white"
+                    : "bg-red-500 hover:bg-red-600 text-white"
+                    }`}
                 >
                   {importSuccess ? `已导入${importedCount}组` : "导入txt数据"}
                 </Button>
@@ -1391,11 +1665,10 @@ export default function LotteryApp() {
                 </Dialog>
                 <Button
                   onClick={resetAll}
-                  className={`px-4 sm:px-8 py-3 text-base sm:text-lg transition-colors ${
-                    resetSuccess
-                      ? "bg-green-500 hover:bg-green-600 text-white"
-                      : "bg-orange-500 hover:bg-orange-600 text-white"
-                  }`}
+                  className={`px-4 sm:px-8 py-3 text-base sm:text-lg transition-colors ${resetSuccess
+                    ? "bg-green-500 hover:bg-green-600 text-white"
+                    : "bg-orange-500 hover:bg-orange-600 text-white"
+                    }`}
                 >
                   {resetSuccess ? "重置成功" : "重置"}
                 </Button>

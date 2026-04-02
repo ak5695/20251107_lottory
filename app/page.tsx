@@ -119,6 +119,9 @@ export default function LotteryApp() {
   const [excludeAnyThreeSum, setExcludeAnyThreeSum] = useState<Set<number>>(
     new Set()
   );
+  const [excludeAnyFourSum, setExcludeAnyFourSum] = useState<Set<number>>(
+    new Set()
+  );
   // 新增：邻号对排除。index 0=>01, 1=>12, ..., 8=>89, 9=>90
   const [excludeAdjacentPairs, setExcludeAdjacentPairs] = useState<Set<number>>(
     new Set()
@@ -294,6 +297,7 @@ export default function LotteryApp() {
     setExcludeAnyThreeSame(new Set());
     setExcludeAnyTwoSum(new Set());
     setExcludeAnyThreeSum(new Set());
+    setExcludeAnyFourSum(new Set());
     setExcludeAdjacentPairs(new Set());
     setKeepTwoCodes(new Set());
     setKillTwoCodes(new Set());
@@ -380,6 +384,8 @@ export default function LotteryApp() {
       "排除任意两个位置数字相加等于指定值的组合，如选择'9'则排除1284(1+8=9)、2736(2+7=9)等",
     去三和:
       "排除任意三个位置数字相加等于指定值的组合，如选择'15'则排除1689(1+6+8=15)、2589(2+5+8=15)等",
+    去四和:
+      "排除四个位置数字相加等于指定值的组合，如选择'15'则排除1239(1+2+3+9=15)、1356(1+3+5+6=15)等",
     不定位两码:
       "只要选中的两个数字在组合中同时出现，即判定为匹配。例如选中'34'，则所有包含3和4的组合（如1345, 3489, 4032等）都将被匹配。对于'33'此类翻倍号，则要求数字3在组合中至少出现两次。",
 
@@ -491,6 +497,12 @@ export default function LotteryApp() {
     return false;
   };
 
+  // 检查是否有任意四位求和等于目标值
+  const hasAnyFourSum = (digits: number[], targetSum: number): boolean => {
+    const [thousands, hundreds, tens, units] = digits;
+    return thousands + hundreds + tens + units === targetSum;
+  };
+
   // 邻号对定义：index 0=>01, 1=>12, ..., 8=>89, 9=>90
   const ADJACENT_PAIRS: [number, number][] = [
     [0, 1], [1, 2], [2, 3], [3, 4], [4, 5],
@@ -593,6 +605,12 @@ export default function LotteryApp() {
       return false;
 
     // 3. 去/留 任意位求和
+    const hasAnyFourSumMatch = Array.from(excludeAnyFourSum).some((s) =>
+      hasAnyFourSum(digits, s)
+    );
+    if (!checkRule("anyFourSum", excludeAnyFourSum, hasAnyFourSumMatch))
+      return false;
+
     const hasAnyThreeSumMatch = Array.from(excludeAnyThreeSum).some((s) =>
       hasAnyThreeSum(digits, s)
     );
@@ -1229,7 +1247,7 @@ export default function LotteryApp() {
 
   // 新增：控制任意位相同和求和的函数
   const toggleAnyDigit = (
-    type: "anyTwoSame" | "anyThreeSame" | "anyTwoSum" | "anyThreeSum",
+    type: "anyTwoSame" | "anyThreeSame" | "anyTwoSum" | "anyThreeSum" | "anyFourSum",
     value: number
   ) => {
     if (type === "anyTwoSame") {
@@ -1264,12 +1282,20 @@ export default function LotteryApp() {
         newSet.add(value);
       }
       setExcludeAnyThreeSum(newSet);
+    } else if (type === "anyFourSum") {
+      const newSet = new Set(excludeAnyFourSum);
+      if (newSet.has(value)) {
+        newSet.delete(value);
+      } else {
+        newSet.add(value);
+      }
+      setExcludeAnyFourSum(newSet);
     }
   };
 
   // 切换全部任意位的排除状态
   const toggleAllAny = (
-    type: "anyTwoSame" | "anyThreeSame" | "anyTwoSum" | "anyThreeSum"
+    type: "anyTwoSame" | "anyThreeSame" | "anyTwoSum" | "anyThreeSum" | "anyFourSum"
   ) => {
     if (type === "anyTwoSame") {
       const allDigits = new Set([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
@@ -1295,6 +1321,12 @@ export default function LotteryApp() {
         excludeAnyThreeSum.has(sum)
       );
       setExcludeAnyThreeSum(isAllSelected ? new Set() : allSums);
+    } else if (type === "anyFourSum") {
+      const allSums = new Set(Array.from({ length: 37 }, (_, i) => i)); // 0-36
+      const isAllSelected = [...allSums].every((sum) =>
+        excludeAnyFourSum.has(sum)
+      );
+      setExcludeAnyFourSum(isAllSelected ? new Set() : allSums);
     }
   };
 
@@ -1338,7 +1370,7 @@ export default function LotteryApp() {
 
   // 渲染任意位求和按钮
   const renderAnySumButtons = (
-    type: "anyTwoSum" | "anyThreeSum",
+    type: "anyTwoSum" | "anyThreeSum" | "anyFourSum",
     label: string,
     excludedSet: Set<number>,
     maxValue: number
@@ -1495,6 +1527,12 @@ export default function LotteryApp() {
                   <Separator className="my-4" />
 
                   {/* 新增：任意位求和 */}
+                  {renderAnySumButtons(
+                    "anyFourSum",
+                    "去四和",
+                    excludeAnyFourSum,
+                    36
+                  )}
                   {renderAnySumButtons(
                     "anyThreeSum",
                     "去三和",

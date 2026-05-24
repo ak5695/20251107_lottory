@@ -126,9 +126,12 @@ export default function LotteryApp() {
   const [excludeAdjacentPairs, setExcludeAdjacentPairs] = useState<Set<number>>(
     new Set()
   );
-  // 新增：不定位两码。分为‘必含’和‘杀号’。
+  // 新增：不定位两码。分为’必含’和’杀号’。
   const [keepTwoCodes, setKeepTwoCodes] = useState<Set<string>>(new Set());
   const [killTwoCodes, setKillTwoCodes] = useState<Set<string>>(new Set());
+  // 新增：前三位不定位两码（第四位无关）。
+  const [keepThreePosTwoCodes, setKeepThreePosTwoCodes] = useState<Set<string>>(new Set());
+  const [killThreePosTwoCodes, setKillThreePosTwoCodes] = useState<Set<string>>(new Set());
   // 筛选模式状态：'exclude' 为去除（默认），'keep' 为留下
   const [filterModes, setFilterModes] = useState<Record<string, "exclude" | "keep">>({});
 
@@ -301,6 +304,8 @@ export default function LotteryApp() {
     setExcludeAdjacentPairs(new Set());
     setKeepTwoCodes(new Set());
     setKillTwoCodes(new Set());
+    setKeepThreePosTwoCodes(new Set());
+    setKillThreePosTwoCodes(new Set());
     setFilterModes({});
     setErrorMessage("");
     setImportSuccess(false);
@@ -517,6 +522,18 @@ export default function LotteryApp() {
     return hasA && hasB;
   };
 
+  // 检查四位数是否包含特定的两码（不定位，仅看前三位）
+  const hasUnfixedTwoCodeInFirstThree = (digits: number[], pairStr: string): boolean => {
+    const a = parseInt(pairStr[0]);
+    const b = parseInt(pairStr[1]);
+    const firstThree = digits.slice(0, 3);
+    if (a === b) {
+      return firstThree.filter((d) => d === a).length >= 2;
+    } else {
+      return firstThree.includes(a) && firstThree.includes(b);
+    }
+  };
+
   // 检查四位数是否包含特定的两码（不定位）
   const hasUnfixedTwoCode = (digits: number[], pairStr: string): boolean => {
     const a = parseInt(pairStr[0]);
@@ -583,10 +600,24 @@ export default function LotteryApp() {
       if (!anyKeepMatch) return false;
     }
 
-    // 逻辑：号码不能包含任何选中的‘杀号’两码 (OR 逻辑)
+    // 逻辑：号码不能包含任何选中的’杀号’两码 (OR 逻辑)
     if (killTwoCodes.size > 0) {
       const anyKillMatch = Array.from(killTwoCodes).some((pairStr) =>
         hasUnfixedTwoCode(digits, pairStr)
+      );
+      if (anyKillMatch) return false;
+    }
+
+    // 1d. 前三位不定位两码（第四位无关）
+    if (keepThreePosTwoCodes.size > 0) {
+      const anyKeepMatch = Array.from(keepThreePosTwoCodes).some((pairStr) =>
+        hasUnfixedTwoCodeInFirstThree(digits, pairStr)
+      );
+      if (!anyKeepMatch) return false;
+    }
+    if (killThreePosTwoCodes.size > 0) {
+      const anyKillMatch = Array.from(killThreePosTwoCodes).some((pairStr) =>
+        hasUnfixedTwoCodeInFirstThree(digits, pairStr)
       );
       if (anyKillMatch) return false;
     }
@@ -1206,6 +1237,131 @@ export default function LotteryApp() {
     );
   };
 
+  // 渲染前三位不定位两码按钮 (00-99)
+  const renderFirstThreeTwoCodeButtons = () => {
+    const grid = [
+      ["00", "01", "02", "03", "04", "05", "06", "07", "08", "09", "99"],
+      ["11", "12", "13", "14", "15", "16", "17", "18", "19", "88", "89"],
+      ["22", "23", "24", "25", "26", "27", "28", "29", "77", "78", "79"],
+      ["33", "34", "35", "36", "37", "38", "39", "66", "67", "68", "69"],
+      ["44", "45", "46", "47", "48", "49", "55", "56", "57", "58", "59"],
+      ["55", "56", "57", "58", "59", "44", "45", "46", "47", "48", "49"],
+      ["66", "67", "68", "69", "33", "34", "35", "36", "37", "38", "39"],
+      ["77", "78", "79", "22", "23", "24", "25", "26", "27", "28", "29"],
+      ["88", "89", "11", "12", "13", "14", "15", "16", "17", "18", "19"],
+      ["99", "00", "01", "02", "03", "04", "05", "06", "07", "08", "09"],
+    ];
+
+    const togglePair = (pair: string, isKeepZone: boolean) => {
+      if (isKeepZone) {
+        setKeepThreePosTwoCodes((prev) => {
+          const next = new Set(prev);
+          if (next.has(pair)) next.delete(pair);
+          else next.add(pair);
+          return next;
+        });
+      } else {
+        setKillThreePosTwoCodes((prev) => {
+          const next = new Set(prev);
+          if (next.has(pair)) next.delete(pair);
+          else next.add(pair);
+          return next;
+        });
+      }
+    };
+
+    const toggleAll = () => {
+      if (keepThreePosTwoCodes.size > 0 || killThreePosTwoCodes.size > 0) {
+        setKeepThreePosTwoCodes(new Set());
+        setKillThreePosTwoCodes(new Set());
+      }
+    };
+
+    return (
+      <div className="mb-6 flex">
+        {/* 左侧标题 */}
+        <div className="flex flex-col items-center mr-2 sm:mr-4 w-12 sm:w-16 shrink-0 mt-2">
+          <div className="text-orange-500 text-sm sm:text-lg font-bold leading-tight">
+            前三位
+          </div>
+          <div className="text-orange-500 text-sm sm:text-lg font-bold leading-tight">
+            不定位
+          </div>
+          <div className="text-orange-500 text-sm sm:text-lg font-bold leading-tight">
+            两码
+          </div>
+        </div>
+
+        <div className="flex-1 overflow-x-auto scroller-hidden">
+          {/* 顶部操作栏 */}
+          <div className="flex items-center gap-2 mb-2">
+            <span className="text-sm font-bold">
+              <span className="text-gray-700">必含</span> /
+              <span className="text-red-500 ml-1">不含(杀)</span>
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={withHapticFeedback(toggleAll, "medium")}
+              className="h-7 px-3 text-xs"
+            >
+              全选
+            </Button>
+          </div>
+
+          {/* 按钮网格 */}
+          <div className="flex flex-col gap-1 min-w-max pb-2">
+            {grid.map((row, rowIndex) => (
+              <div key={rowIndex} className="flex gap-1">
+                {row.map((pair, colIndex) => {
+                  const isRedArea = (rowIndex === 0 && colIndex >= 10) ||
+                    (rowIndex === 1 && colIndex >= 9) ||
+                    (rowIndex === 2 && colIndex >= 8) ||
+                    (rowIndex === 3 && colIndex >= 7) ||
+                    (rowIndex === 4 && colIndex >= 6) ||
+                    (rowIndex === 5 && colIndex >= 5) ||
+                    (rowIndex === 6 && colIndex >= 4) ||
+                    (rowIndex === 7 && colIndex >= 3) ||
+                    (rowIndex === 8 && colIndex >= 2) ||
+                    (rowIndex === 9 && colIndex >= 1);
+
+                  const isSelected = isRedArea
+                    ? killThreePosTwoCodes.has(pair)
+                    : keepThreePosTwoCodes.has(pair);
+
+                  return (
+                    <Button
+                      key={`${rowIndex}-${colIndex}`}
+                      onClick={withHapticFeedback(
+                        () => togglePair(pair, !isRedArea),
+                        "light"
+                      )}
+                      className={`w-8 h-8 sm:w-10 sm:h-10 p-0 text-xs sm:text-sm font-bold transition-all border-2 ${isSelected
+                        ? (isRedArea ? "bg-red-500 border-red-700 shadow-inner" : "bg-green-500 border-green-700 shadow-inner") + " text-white"
+                        : (isRedArea ? "bg-orange-400 border-red-500 hover:bg-orange-500" : "bg-orange-400 border-green-500 hover:bg-orange-500") + " text-white shadow-sm"
+                        }`}
+                    >
+                      {pair}
+                    </Button>
+                  );
+                })}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* 右侧提示文案 */}
+        <div className="hidden lg:block w-48 ml-4 text-[10px] text-gray-500 border-l pl-2 leading-normal self-center">
+          <div className="flex items-start gap-1">
+            <span className="p-0.5 bg-gray-100 rounded leading-none">ⓘ</span>
+            <p>
+              前三位不定位两码：仅对千位、百位、十位（前三位）进行匹配，个位不参与判断。规则同不定位两码：豹子号一组，如999→99；组三号两组，如227→22、27；组六号三组，如571→15、17、57。
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  };
 
   // 渲染连号选择按钮
   const renderConsecutiveButtons = (
@@ -1509,6 +1665,11 @@ export default function LotteryApp() {
 
                   {/* 不定位两码 */}
                   {renderUnfixedTwoCodeButtons()}
+
+                  <Separator className="my-4" />
+
+                  {/* 前三位不定位两码 */}
+                  {renderFirstThreeTwoCodeButtons()}
 
                   <Separator className="my-4" />
 

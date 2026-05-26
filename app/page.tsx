@@ -132,6 +132,15 @@ export default function LotteryApp() {
   // 新增：前三位不定位两码（第四位无关）。
   const [keepThreePosTwoCodes, setKeepThreePosTwoCodes] = useState<Set<string>>(new Set());
   const [killThreePosTwoCodes, setKillThreePosTwoCodes] = useState<Set<string>>(new Set());
+  // 新增：千十个位不定位两码（千位、十位、个位）。
+  const [keepQianShiGeTwoCodes, setKeepQianShiGeTwoCodes] = useState<Set<string>>(new Set());
+  const [killQianShiGeTwoCodes, setKillQianShiGeTwoCodes] = useState<Set<string>>(new Set());
+  // 新增：百十个位不定位两码（百位、十位、个位）。
+  const [keepBaiShiGeTwoCodes, setKeepBaiShiGeTwoCodes] = useState<Set<string>>(new Set());
+  const [killBaiShiGeTwoCodes, setKillBaiShiGeTwoCodes] = useState<Set<string>>(new Set());
+  // 新增：千百个位不定位两码（千位、百位、个位）。
+  const [keepQianBaiGeTwoCodes, setKeepQianBaiGeTwoCodes] = useState<Set<string>>(new Set());
+  const [killQianBaiGeTwoCodes, setKillQianBaiGeTwoCodes] = useState<Set<string>>(new Set());
   // 筛选模式状态：'exclude' 为去除（默认），'keep' 为留下
   const [filterModes, setFilterModes] = useState<Record<string, "exclude" | "keep">>({});
 
@@ -522,17 +531,21 @@ export default function LotteryApp() {
     return hasA && hasB;
   };
 
-  // 检查四位数是否包含特定的两码（不定位，仅看前三位）
-  const hasUnfixedTwoCodeInFirstThree = (digits: number[], pairStr: string): boolean => {
+  // 检查四位数是否在指定位置索引中包含特定的两码（不定位）
+  const hasUnfixedTwoCodeInPositions = (digits: number[], pairStr: string, indices: number[]): boolean => {
     const a = parseInt(pairStr[0]);
     const b = parseInt(pairStr[1]);
-    const firstThree = digits.slice(0, 3);
+    const selected = indices.map((i) => digits[i]);
     if (a === b) {
-      return firstThree.filter((d) => d === a).length >= 2;
+      return selected.filter((d) => d === a).length >= 2;
     } else {
-      return firstThree.includes(a) && firstThree.includes(b);
+      return selected.includes(a) && selected.includes(b);
     }
   };
+
+  // 检查四位数是否包含特定的两码（不定位，仅看前三位）
+  const hasUnfixedTwoCodeInFirstThree = (digits: number[], pairStr: string): boolean =>
+    hasUnfixedTwoCodeInPositions(digits, pairStr, [0, 1, 2]);
 
   // 检查四位数是否包含特定的两码（不定位）
   const hasUnfixedTwoCode = (digits: number[], pairStr: string): boolean => {
@@ -618,6 +631,48 @@ export default function LotteryApp() {
     if (killThreePosTwoCodes.size > 0) {
       const anyKillMatch = Array.from(killThreePosTwoCodes).some((pairStr) =>
         hasUnfixedTwoCodeInFirstThree(digits, pairStr)
+      );
+      if (anyKillMatch) return false;
+    }
+
+    // 1e. 千十个位不定位两码（千位、十位、个位）
+    if (keepQianShiGeTwoCodes.size > 0) {
+      const anyKeepMatch = Array.from(keepQianShiGeTwoCodes).some((pairStr) =>
+        hasUnfixedTwoCodeInPositions(digits, pairStr, [0, 2, 3])
+      );
+      if (!anyKeepMatch) return false;
+    }
+    if (killQianShiGeTwoCodes.size > 0) {
+      const anyKillMatch = Array.from(killQianShiGeTwoCodes).some((pairStr) =>
+        hasUnfixedTwoCodeInPositions(digits, pairStr, [0, 2, 3])
+      );
+      if (anyKillMatch) return false;
+    }
+
+    // 1f. 百十个位不定位两码（百位、十位、个位）
+    if (keepBaiShiGeTwoCodes.size > 0) {
+      const anyKeepMatch = Array.from(keepBaiShiGeTwoCodes).some((pairStr) =>
+        hasUnfixedTwoCodeInPositions(digits, pairStr, [1, 2, 3])
+      );
+      if (!anyKeepMatch) return false;
+    }
+    if (killBaiShiGeTwoCodes.size > 0) {
+      const anyKillMatch = Array.from(killBaiShiGeTwoCodes).some((pairStr) =>
+        hasUnfixedTwoCodeInPositions(digits, pairStr, [1, 2, 3])
+      );
+      if (anyKillMatch) return false;
+    }
+
+    // 1g. 千百个位不定位两码（千位、百位、个位）
+    if (keepQianBaiGeTwoCodes.size > 0) {
+      const anyKeepMatch = Array.from(keepQianBaiGeTwoCodes).some((pairStr) =>
+        hasUnfixedTwoCodeInPositions(digits, pairStr, [0, 1, 3])
+      );
+      if (!anyKeepMatch) return false;
+    }
+    if (killQianBaiGeTwoCodes.size > 0) {
+      const anyKillMatch = Array.from(killQianBaiGeTwoCodes).some((pairStr) =>
+        hasUnfixedTwoCodeInPositions(digits, pairStr, [0, 1, 3])
       );
       if (anyKillMatch) return false;
     }
@@ -1237,8 +1292,15 @@ export default function LotteryApp() {
     );
   };
 
-  // 渲染前三位不定位两码按钮 (00-99)
-  const renderFirstThreeTwoCodeButtons = () => {
+  // 渲染指定位置的不定位两码按钮（通用）
+  const renderPosTwoCodeButtons = (
+    label: string[],
+    tipText: string,
+    keepSet: Set<string>,
+    killSet: Set<string>,
+    setKeep: React.Dispatch<React.SetStateAction<Set<string>>>,
+    setKill: React.Dispatch<React.SetStateAction<Set<string>>>
+  ) => {
     const grid = [
       ["00", "01", "02", "03", "04", "05", "06", "07", "08", "09", "99"],
       ["11", "12", "13", "14", "15", "16", "17", "18", "19", "88", "89"],
@@ -1254,46 +1316,38 @@ export default function LotteryApp() {
 
     const togglePair = (pair: string, isKeepZone: boolean) => {
       if (isKeepZone) {
-        setKeepThreePosTwoCodes((prev) => {
+        setKeep((prev) => {
           const next = new Set(prev);
-          if (next.has(pair)) next.delete(pair);
-          else next.add(pair);
+          if (next.has(pair)) next.delete(pair); else next.add(pair);
           return next;
         });
       } else {
-        setKillThreePosTwoCodes((prev) => {
+        setKill((prev) => {
           const next = new Set(prev);
-          if (next.has(pair)) next.delete(pair);
-          else next.add(pair);
+          if (next.has(pair)) next.delete(pair); else next.add(pair);
           return next;
         });
       }
     };
 
     const toggleAll = () => {
-      if (keepThreePosTwoCodes.size > 0 || killThreePosTwoCodes.size > 0) {
-        setKeepThreePosTwoCodes(new Set());
-        setKillThreePosTwoCodes(new Set());
+      if (keepSet.size > 0 || killSet.size > 0) {
+        setKeep(new Set());
+        setKill(new Set());
       }
     };
 
     return (
       <div className="mb-6 flex">
-        {/* 左侧标题 */}
         <div className="flex flex-col items-center mr-2 sm:mr-4 w-12 sm:w-16 shrink-0 mt-2">
-          <div className="text-orange-500 text-sm sm:text-lg font-bold leading-tight">
-            前三位
-          </div>
-          <div className="text-orange-500 text-sm sm:text-lg font-bold leading-tight">
-            不定位
-          </div>
-          <div className="text-orange-500 text-sm sm:text-lg font-bold leading-tight">
-            两码
-          </div>
+          {label.map((line, i) => (
+            <div key={i} className="text-orange-500 text-sm sm:text-lg font-bold leading-tight">
+              {line}
+            </div>
+          ))}
         </div>
 
         <div className="flex-1 overflow-x-auto scroller-hidden">
-          {/* 顶部操作栏 */}
           <div className="flex items-center gap-2 mb-2">
             <span className="text-sm font-bold">
               <span className="text-gray-700">必含</span> /
@@ -1309,7 +1363,6 @@ export default function LotteryApp() {
             </Button>
           </div>
 
-          {/* 按钮网格 */}
           <div className="flex flex-col gap-1 min-w-max pb-2">
             {grid.map((row, rowIndex) => (
               <div key={rowIndex} className="flex gap-1">
@@ -1325,17 +1378,12 @@ export default function LotteryApp() {
                     (rowIndex === 8 && colIndex >= 2) ||
                     (rowIndex === 9 && colIndex >= 1);
 
-                  const isSelected = isRedArea
-                    ? killThreePosTwoCodes.has(pair)
-                    : keepThreePosTwoCodes.has(pair);
+                  const isSelected = isRedArea ? killSet.has(pair) : keepSet.has(pair);
 
                   return (
                     <Button
                       key={`${rowIndex}-${colIndex}`}
-                      onClick={withHapticFeedback(
-                        () => togglePair(pair, !isRedArea),
-                        "light"
-                      )}
+                      onClick={withHapticFeedback(() => togglePair(pair, !isRedArea), "light")}
                       className={`w-8 h-8 sm:w-10 sm:h-10 p-0 text-xs sm:text-sm font-bold transition-all border-2 ${isSelected
                         ? (isRedArea ? "bg-red-500 border-red-700 shadow-inner" : "bg-green-500 border-green-700 shadow-inner") + " text-white"
                         : (isRedArea ? "bg-orange-400 border-red-500 hover:bg-orange-500" : "bg-orange-400 border-green-500 hover:bg-orange-500") + " text-white shadow-sm"
@@ -1350,18 +1398,47 @@ export default function LotteryApp() {
           </div>
         </div>
 
-        {/* 右侧提示文案 */}
         <div className="hidden lg:block w-48 ml-4 text-[10px] text-gray-500 border-l pl-2 leading-normal self-center">
           <div className="flex items-start gap-1">
             <span className="p-0.5 bg-gray-100 rounded leading-none">ⓘ</span>
-            <p>
-              前三位不定位两码：仅对千位、百位、十位（前三位）进行匹配，个位不参与判断。规则同不定位两码：豹子号一组，如999→99；组三号两组，如227→22、27；组六号三组，如571→15、17、57。
-            </p>
+            <p>{tipText}</p>
           </div>
         </div>
       </div>
     );
   };
+
+  const renderFirstThreeTwoCodeButtons = () =>
+    renderPosTwoCodeButtons(
+      ["前三位", "不定位", "两码"],
+      "前三位不定位两码：仅对千位、百位、十位（前三位）进行匹配，个位不参与判断。规则同不定位两码：豹子号一组，如999→99；组三号两组，如227→22、27；组六号三组，如571→15、17、57。",
+      keepThreePosTwoCodes, killThreePosTwoCodes,
+      setKeepThreePosTwoCodes, setKillThreePosTwoCodes
+    );
+
+  const renderQianShiGeTwoCodeButtons = () =>
+    renderPosTwoCodeButtons(
+      ["千十个", "不定位", "两码"],
+      "千十个位不定位两码：仅对千位、十位、个位进行匹配，百位不参与判断。规则同不定位两码：豹子号一组，如999→99；组三号两组，如227→22、27；组六号三组，如571→15、17、57。",
+      keepQianShiGeTwoCodes, killQianShiGeTwoCodes,
+      setKeepQianShiGeTwoCodes, setKillQianShiGeTwoCodes
+    );
+
+  const renderBaiShiGeTwoCodeButtons = () =>
+    renderPosTwoCodeButtons(
+      ["百十个", "不定位", "两码"],
+      "百十个位不定位两码：仅对百位、十位、个位进行匹配，千位不参与判断。规则同不定位两码：豹子号一组，如999→99；组三号两组，如227→22、27；组六号三组，如571→15、17、57。",
+      keepBaiShiGeTwoCodes, killBaiShiGeTwoCodes,
+      setKeepBaiShiGeTwoCodes, setKillBaiShiGeTwoCodes
+    );
+
+  const renderQianBaiGeTwoCodeButtons = () =>
+    renderPosTwoCodeButtons(
+      ["千百个", "不定位", "两码"],
+      "千百个位不定位两码：仅对千位、百位、个位进行匹配，十位不参与判断。规则同不定位两码：豹子号一组，如999→99；组三号两组，如227→22、27；组六号三组，如571→15、17、57。",
+      keepQianBaiGeTwoCodes, killQianBaiGeTwoCodes,
+      setKeepQianBaiGeTwoCodes, setKillQianBaiGeTwoCodes
+    );
 
   // 渲染连号选择按钮
   const renderConsecutiveButtons = (
@@ -1670,6 +1747,21 @@ export default function LotteryApp() {
 
                   {/* 前三位不定位两码 */}
                   {renderFirstThreeTwoCodeButtons()}
+
+                  <Separator className="my-4" />
+
+                  {/* 千十个位不定位两码 */}
+                  {renderQianShiGeTwoCodeButtons()}
+
+                  <Separator className="my-4" />
+
+                  {/* 百十个位不定位两码 */}
+                  {renderBaiShiGeTwoCodeButtons()}
+
+                  <Separator className="my-4" />
+
+                  {/* 千百个位不定位两码 */}
+                  {renderQianBaiGeTwoCodeButtons()}
 
                   <Separator className="my-4" />
 

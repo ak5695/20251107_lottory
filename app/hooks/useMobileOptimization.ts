@@ -1,20 +1,21 @@
 import React from "react";
 
+let hasUserInteracted = false;
+
+if (typeof window !== "undefined") {
+  const markInteracted = () => { hasUserInteracted = true; };
+  window.addEventListener("pointerdown", markInteracted, { once: true, passive: true });
+  window.addEventListener("touchstart", markInteracted, { once: true, passive: true });
+}
+
 export const triggerHapticFeedback = (
   type: "light" | "medium" | "heavy" = "light"
 ) => {
-  if ("vibrate" in navigator) {
-    switch (type) {
-      case "light":
-        navigator.vibrate(10);
-        break;
-      case "medium":
-        navigator.vibrate(25);
-        break;
-      case "heavy":
-        navigator.vibrate(50);
-        break;
-    }
+  if (!hasUserInteracted || !("vibrate" in navigator)) return;
+  switch (type) {
+    case "light": navigator.vibrate(10); break;
+    case "medium": navigator.vibrate(25); break;
+    case "heavy": navigator.vibrate(50); break;
   }
 };
 

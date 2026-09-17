@@ -1,5 +1,6 @@
 "use client";
 
+import { SetOperations } from "@/components/set-operations";
 import React, { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -74,6 +75,8 @@ export default function LotteryApp() {
     };
   };
 
+  const [activeMode, setActiveMode] = useState<"filter" | "sets">("filter");
+  const [setInputA, setSetInputA] = useState("");
   const [inputData, setInputData] = useState("");
   const [processedData, setProcessedData] = useState<string[]>([]);
   const [excludedNumbers, setExcludedNumbers] = useState({
@@ -1673,6 +1676,22 @@ export default function LotteryApp() {
                 </div>
               )}
 
+              <nav aria-label="功能切换" className="mb-4 grid grid-cols-2 gap-2">
+                <Button aria-pressed={activeMode === "filter"} className={`h-auto px-4 py-3 text-base sm:text-lg font-bold border ${activeMode === "filter" ? "bg-red-500 hover:bg-red-600 border-red-500 text-white" : "bg-white hover:bg-gray-100 border-gray-300 text-gray-700"}`} onClick={() => setActiveMode("filter")}>号码筛选</Button>
+                <Button aria-pressed={activeMode === "sets"} className={`h-auto px-4 py-3 text-base sm:text-lg font-bold border ${activeMode === "sets" ? "bg-red-500 hover:bg-red-600 border-red-500 text-white" : "bg-white hover:bg-gray-100 border-gray-300 text-gray-700"}`} onClick={() => setActiveMode("sets")}>两组数据运算</Button>
+              </nav>
+              <div hidden={activeMode !== "sets"}>
+                <SetOperations inputA={setInputA} onInputAChange={setSetInputA} onFilter={(numbers) => {
+                  setInputData(numbers.join(" "));
+                  setProcessedData([]);
+                  setImportSuccess(false);
+                  setErrorMessage("");
+                  setIsDataExpanded(true);
+                  setActiveMode("filter");
+                  showSuccessMessage("已填入数据输入，继续使用当前筛选条件");
+                }} />
+              </div>
+              <div hidden={activeMode !== "filter"}>
               <Card className="mb-4">
                 <CardHeader
                   className="cursor-pointer pb-0"
@@ -1858,11 +1877,12 @@ export default function LotteryApp() {
                 onChange={handleFileChange}
                 style={{ display: "none" }}
               />
+              </div>
             </div>
           </div>
 
           {/* 固定在底部的功能按钮 */}
-          <div className="fixed bottom-0 left-0 right-0 bg-white shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)] z-50 py-4">
+          <div hidden={activeMode !== "filter"} className="fixed bottom-0 left-0 right-0 bg-white shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)] z-50 py-4">
             <div className="max-w-6xl mx-auto px-4">
               <div className="flex flex-col sm:flex-row gap-2 sm:gap-4 justify-center">
                 <Button
@@ -1920,6 +1940,12 @@ export default function LotteryApp() {
                       </div>
                     </div>
 
+                    <Button variant="outline" className="mb-3 w-full" onClick={() => {
+                      setSetInputA(processedData.join(" "));
+                      setShowPreview(false);
+                      setActiveMode("sets");
+                      window.scrollTo({ top: 0, behavior: "smooth" });
+                    }}>用此结果进行两组运算 →</Button>
                     {/* 可滚动的数据内容 */}
                     <div className="bg-gray-100 p-4 rounded-md max-h-60 overflow-y-auto">
                       <pre className="whitespace-pre-wrap text-sm">
